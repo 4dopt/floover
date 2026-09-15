@@ -1,0 +1,6 @@
+{
+  "name": "Floover",
+  "description": "Intuitive drag-and-drop floor plan designer for restaurants and event planners with table covers, real-time team collaboration, room templates, cloud sync, and PDF export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
