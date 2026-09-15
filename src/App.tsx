@@ -752,6 +752,7 @@ export default function App() {
             {/* Interactive SVG Floor Plan Canvas */}
             <Canvas
               floorPlan={floorPlan}
+              onUpdateFloorPlan={handleUpdateFloorPlan}
               selectedElementId={selectedElementId}
               onSelectElement={handleSelectElement}
               onUpdateElement={handleUpdateElement}

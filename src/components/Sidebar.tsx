@@ -30,6 +30,7 @@ import {
   getEndChairIndices,
   getEffectiveCovers
 } from '../utils/chairLayout';
+import { clampElementPosition } from '../utils/geometry';
 
 interface SidebarProps {
   floorPlan: FloorPlan;
@@ -758,7 +759,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div>
                   <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600 mb-1">
                     <span>Rotation</span>
-                    <span>{selectedElement.rotation || 0}°</span>
+                    <span className="font-mono text-indigo-600 font-bold">{selectedElement.rotation || 0}°</span>
                   </div>
                   <input
                     id="slider-rotation"
@@ -766,9 +767,90 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     min="0"
                     max="359"
                     value={selectedElement.rotation || 0}
-                    onChange={(e) => onUpdateElement({ ...selectedElement, rotation: Number(e.target.value) })}
-                    className="w-full accent-slate-800"
+                    onChange={(e) => {
+                      const newRot = Number(e.target.value);
+                      const clamped = clampElementPosition(
+                        selectedElement.x,
+                        selectedElement.y,
+                        selectedElement.width,
+                        selectedElement.height,
+                        newRot,
+                        floorPlan.roomWidth * 20,
+                        floorPlan.roomHeight * 20,
+                        8
+                      );
+                      onUpdateElement({
+                        ...selectedElement,
+                        rotation: newRot,
+                        x: clamped.x,
+                        y: clamped.y
+                      });
+                    }}
+                    className="w-full accent-indigo-600"
                   />
+
+                  {/* Quick Rotation Orientation Presets */}
+                  <div className="grid grid-cols-5 gap-1 mt-2">
+                    {[0, 90, 180, 270].map((deg) => (
+                      <button
+                        key={deg}
+                        type="button"
+                        onClick={() => {
+                          const clamped = clampElementPosition(
+                            selectedElement.x,
+                            selectedElement.y,
+                            selectedElement.width,
+                            selectedElement.height,
+                            deg,
+                            floorPlan.roomWidth * 20,
+                            floorPlan.roomHeight * 20,
+                            8
+                          );
+                          onUpdateElement({
+                            ...selectedElement,
+                            rotation: deg,
+                            x: clamped.x,
+                            y: clamped.y
+                          });
+                        }}
+                        className={`py-1 text-[10px] font-semibold rounded-md border transition ${
+                          (selectedElement.rotation || 0) === deg
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200'
+                        }`}
+                        title={deg === 0 ? 'Horizontal (0°)' : deg === 90 ? 'Vertical (90°)' : `${deg}°`}
+                      >
+                        {deg}°
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextRot = ((selectedElement.rotation || 0) + 90) % 360;
+                        const clamped = clampElementPosition(
+                          selectedElement.x,
+                          selectedElement.y,
+                          selectedElement.width,
+                          selectedElement.height,
+                          nextRot,
+                          floorPlan.roomWidth * 20,
+                          floorPlan.roomHeight * 20,
+                          8
+                        );
+                        onUpdateElement({
+                          ...selectedElement,
+                          rotation: nextRot,
+                          x: clamped.x,
+                          y: clamped.y
+                        });
+                      }}
+                      className="py-1 text-[10px] font-bold rounded-md bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center justify-center gap-0.5"
+                      title="Rotate +90°"
+                    >
+                      <RotateCw className="w-2.5 h-2.5" />
+                      <span>+90</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 

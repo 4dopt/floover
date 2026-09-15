@@ -15,7 +15,15 @@ import {
   Crown,
   Square,
   Sparkles,
-  Armchair
+  Armchair,
+  Hand,
+  MousePointer,
+  GripHorizontal,
+  ArrowLeftRight,
+  ArrowUpDown,
+  Scaling,
+  X,
+  Sliders
 } from 'lucide-react';
 import { FloorElement, FloorPlan, Collaborator, TableStatus } from '../types';
 import {
@@ -24,9 +32,15 @@ import {
   getCornerChairIndices,
   getEndChairIndices
 } from '../utils/chairLayout';
+import {
+  getElementRotatedExtents,
+  clampElementPosition,
+  dragClampElementPosition
+} from '../utils/geometry';
 
 interface CanvasProps {
   floorPlan: FloorPlan;
+  onUpdateFloorPlan?: (updates: Partial<FloorPlan>) => void;
   selectedElementId: string | null;
   onSelectElement: (id: string | null) => void;
   onUpdateElement: (element: FloorElement) => void;
@@ -42,6 +56,7 @@ interface CanvasProps {
 
 export const Canvas: React.FC<CanvasProps> = ({
   floorPlan,
+  onUpdateFloorPlan,
   selectedElementId,
   onSelectElement,
   onUpdateElement,
@@ -56,6 +71,25 @@ export const Canvas: React.FC<CanvasProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Active tool: 'select' (V) vs 'pan' (H or hold Space)
+  const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
+  const [isSpacePressed, setIsSpacePressed] = useState(false);
+
+  // Floor resize state (dragging right border, bottom border, or bottom-right corner)
+  interface FloorResizeState {
+    direction: 'e' | 's' | 'se';
+    startWidth: number;
+    startHeight: number;
+    startClientX: number;
+    startClientY: number;
+    currentWidth: number;
+    currentHeight: number;
+  }
+  const [floorResize, setFloorResize] = useState<FloorResizeState | null>(null);
+
+  // Floor dimensions quick modal popover
+  const [isFloorDimensionModalOpen, setIsFloorDimensionModalOpen] = useState(false);
 
   // Pan & Zoom state
   const [zoom, setZoom] = useState(1);
@@ -73,11 +107,87 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Convert room dimensions to SVG canvas coordinates
   // 1 unit (ft/m) = 20 pixels by default
   const scaleRatio = 20;
-  const roomWidthPx = floorPlan.roomWidth * scaleRatio;
-  const roomHeightPx = floorPlan.roomHeight * scaleRatio;
+
+  // Minimum room dimensions required so existing tables and fixtures are never cut off (accounting for rotation)
+  const maxElementX = floorPlan.elements.reduce((max, el) => {
+    const { halfW } = getElementRotatedExtents(el.width, el.height, el.rotation || 0);
+    const cx = el.x + el.width / 2;
+    return Math.max(max, cx + halfW);
+  }, 0);
+  const maxElementY = floorPlan.elements.reduce((max, el) => {
+    const { halfH } = getElementRotatedExtents(el.width, el.height, el.rotation || 0);
+    const cy = el.y + el.height / 2;
+    return Math.max(max, cy + halfH);
+  }, 0);
+  const minAllowedWidth = Math.max(12, Math.ceil((maxElementX + 30) / scaleRatio));
+  const minAllowedHeight = Math.max(12, Math.ceil((maxElementY + 30) / scaleRatio));
+
+  // Current effective dimensions (live during resize drag)
+  const effectiveRoomWidth = floorResize ? floorResize.currentWidth : floorPlan.roomWidth;
+  const effectiveRoomHeight = floorResize ? floorResize.currentHeight : floorPlan.roomHeight;
+  const roomWidthPx = effectiveRoomWidth * scaleRatio;
+  const roomHeightPx = effectiveRoomHeight * scaleRatio;
 
   // Selected element
   const selectedElement = floorPlan.elements.find((e) => e.id === selectedElementId);
+
+  // Keyboard shortcuts: Space to pan, V for select, H for pan
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((e.target as HTMLElement).tagName)) {
+        return;
+      }
+      if (e.code === 'Space' && !e.repeat) {
+        setIsSpacePressed(true);
+      }
+      if (e.key === 'v' || e.key === 'V') {
+        setActiveTool('select');
+      }
+      if (e.key === 'h' || e.key === 'H') {
+        setActiveTool('pan');
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        setIsSpacePressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Global pointerup to ensure pan and resize cleanly complete anywhere on screen
+  useEffect(() => {
+    const handleGlobalPointerUp = () => {
+      if (floorResize) {
+        if (
+          onUpdateFloorPlan &&
+          (floorResize.currentWidth !== floorPlan.roomWidth ||
+            floorResize.currentHeight !== floorPlan.roomHeight)
+        ) {
+          onUpdateFloorPlan({
+            roomWidth: floorResize.currentWidth,
+            roomHeight: floorResize.currentHeight
+          });
+        }
+        setFloorResize(null);
+      }
+      setIsPanning(false);
+      setDraggedElementId(null);
+      setIsRotating(false);
+    };
+
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+    };
+  }, [floorResize, onUpdateFloorPlan, floorPlan.roomWidth, floorPlan.roomHeight]);
 
   // Grid snap helper
   const snap = (val: number, step = 10) => {
@@ -96,6 +206,29 @@ export const Canvas: React.FC<CanvasProps> = ({
       y: relY / zoom
     };
   }, [pan, zoom]);
+
+  // Start resizing floor from edge or corner
+  const handleFloorResizeStart = (e: React.PointerEvent, direction: 'e' | 's' | 'se') => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!onUpdateFloorPlan) return;
+
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+
+    setFloorResize({
+      direction,
+      startWidth: floorPlan.roomWidth,
+      startHeight: floorPlan.roomHeight,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      currentWidth: floorPlan.roomWidth,
+      currentHeight: floorPlan.roomHeight
+    });
+  };
 
   // Handle Wheel for Pan & Zoom
   const handleWheel = (e: React.WheelEvent) => {
@@ -134,7 +267,38 @@ export const Canvas: React.FC<CanvasProps> = ({
     const coords = clientToCanvasCoords(e.clientX, e.clientY);
     onCursorMove(coords.x, coords.y);
 
-    // Pan canvas
+    // 1. Resizing floor canvas takes highest precedence
+    if (floorResize) {
+      const deltaX = (e.clientX - floorResize.startClientX) / (zoom * scaleRatio);
+      const deltaY = (e.clientY - floorResize.startClientY) / (zoom * scaleRatio);
+      let newWidth = floorResize.startWidth;
+      let newHeight = floorResize.startHeight;
+
+      if (floorResize.direction === 'e' || floorResize.direction === 'se') {
+        let rawW = floorResize.startWidth + deltaX;
+        rawW = snapToGrid ? Math.round(rawW / 2) * 2 : Math.round(rawW);
+        newWidth = Math.max(minAllowedWidth, Math.min(250, rawW));
+      }
+
+      if (floorResize.direction === 's' || floorResize.direction === 'se') {
+        let rawH = floorResize.startHeight + deltaY;
+        rawH = snapToGrid ? Math.round(rawH / 2) * 2 : Math.round(rawH);
+        newHeight = Math.max(minAllowedHeight, Math.min(250, rawH));
+      }
+
+      setFloorResize((prev) =>
+        prev
+          ? {
+              ...prev,
+              currentWidth: newWidth,
+              currentHeight: newHeight
+            }
+          : null
+      );
+      return;
+    }
+
+    // 2. Pan canvas
     if (isPanning) {
       setPan({
         x: e.clientX - panStart.x,
@@ -143,7 +307,7 @@ export const Canvas: React.FC<CanvasProps> = ({
       return;
     }
 
-    // Rotating element
+    // 3. Rotating element
     if (isRotating && selectedElement) {
       const centerX = selectedElement.x + selectedElement.width / 2;
       const centerY = selectedElement.y + selectedElement.height / 2;
@@ -155,15 +319,30 @@ export const Canvas: React.FC<CanvasProps> = ({
       if (snapToGrid) {
         newRotation = Math.round(newRotation / 15) * 15;
       }
+      const finalRotation = Math.round(newRotation);
+
+      // Keep rotated element within room boundaries
+      const clampedPos = clampElementPosition(
+        selectedElement.x,
+        selectedElement.y,
+        selectedElement.width,
+        selectedElement.height,
+        finalRotation,
+        roomWidthPx,
+        roomHeightPx,
+        8
+      );
 
       onUpdateElement({
         ...selectedElement,
-        rotation: Math.round(newRotation)
+        x: clampedPos.x,
+        y: clampedPos.y,
+        rotation: finalRotation
       });
       return;
     }
 
-    // Dragging element
+    // 4. Dragging element
     if (draggedElementId) {
       const el = floorPlan.elements.find((e) => e.id === draggedElementId);
       if (!el || el.locked) return;
@@ -171,22 +350,42 @@ export const Canvas: React.FC<CanvasProps> = ({
       const rawX = coords.x - dragOffset.x;
       const rawY = coords.y - dragOffset.y;
 
-      // Keep within room boundaries
-      const clampedX = Math.max(10, Math.min(roomWidthPx - el.width - 10, rawX));
-      const clampedY = Math.max(10, Math.min(roomHeightPx - el.height - 10, rawY));
-
-      const snappedX = snap(clampedX, 10);
-      const snappedY = snap(clampedY, 10);
+      // Keep rotated element completely within room boundaries without artificial edge limitations
+      const clamped = dragClampElementPosition(
+        rawX,
+        rawY,
+        el.width,
+        el.height,
+        el.rotation || 0,
+        roomWidthPx,
+        roomHeightPx,
+        snapToGrid,
+        10,
+        8
+      );
 
       onUpdateElement({
         ...el,
-        x: snappedX,
-        y: snappedY
+        x: clamped.x,
+        y: clamped.y
       });
     }
   };
 
   const handlePointerUp = () => {
+    if (floorResize) {
+      if (
+        onUpdateFloorPlan &&
+        (floorResize.currentWidth !== floorPlan.roomWidth ||
+          floorResize.currentHeight !== floorPlan.roomHeight)
+      ) {
+        onUpdateFloorPlan({
+          roomWidth: floorResize.currentWidth,
+          roomHeight: floorResize.currentHeight
+        });
+      }
+      setFloorResize(null);
+    }
     setIsPanning(false);
     setDraggedElementId(null);
     setIsRotating(false);
@@ -195,6 +394,17 @@ export const Canvas: React.FC<CanvasProps> = ({
   // Start element drag
   const handleElementPointerDown = (e: React.PointerEvent, el: FloorElement) => {
     e.stopPropagation();
+
+    // If in Pan mode or holding Space or middle-clicking, pan the floor canvas instead of dragging element
+    if (activeTool === 'pan' || isSpacePressed || e.button === 1) {
+      setIsPanning(true);
+      setPanStart({
+        x: e.clientX - pan.x,
+        y: e.clientY - pan.y
+      });
+      return;
+    }
+
     onSelectElement(el.id);
 
     if (el.locked) return;
@@ -222,17 +432,17 @@ export const Canvas: React.FC<CanvasProps> = ({
     setIsRotating(true);
   };
 
-  // Canvas background click (deselect)
+  // Canvas background click (deselect & drag canvas to pan)
   const handleCanvasBackgroundPointerDown = (e: React.PointerEvent) => {
-    if (e.target === e.currentTarget || (e.target as HTMLElement).tagName === 'svg') {
-      onSelectElement(null);
-      // Pan canvas
-      setIsPanning(true);
-      setPanStart({
-        x: e.clientX - pan.x,
-        y: e.clientY - pan.y
-      });
-    }
+    if (e.button === 2) return; // ignore right-click
+
+    onSelectElement(null);
+    // Pan canvas
+    setIsPanning(true);
+    setPanStart({
+      x: e.clientX - pan.x,
+      y: e.clientY - pan.y
+    });
   };
 
   // Zoom helpers
@@ -317,11 +527,26 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
-  // Rotate 45 deg step
-  const handleRotateStep = () => {
+  // Rotate step (45 deg or 90 deg) with boundary safety
+  const handleRotateStep = (step = 45) => {
     if (!selectedElement) return;
-    const newRot = (selectedElement.rotation + 45) % 360;
-    onUpdateElement({ ...selectedElement, rotation: newRot });
+    const newRot = (selectedElement.rotation + step) % 360;
+    const clampedPos = clampElementPosition(
+      selectedElement.x,
+      selectedElement.y,
+      selectedElement.width,
+      selectedElement.height,
+      newRot,
+      roomWidthPx,
+      roomHeightPx,
+      8
+    );
+    onUpdateElement({
+      ...selectedElement,
+      rotation: newRot,
+      x: clampedPos.x,
+      y: clampedPos.y
+    });
   };
 
   // Status toggle
@@ -340,10 +565,48 @@ export const Canvas: React.FC<CanvasProps> = ({
       onPointerDown={handleCanvasBackgroundPointerDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className="relative flex-1 h-full w-full bg-slate-100/90 overflow-hidden select-none cursor-default"
+      className={`relative flex-1 h-full w-full bg-slate-100/90 overflow-hidden select-none ${
+        isPanning
+          ? 'cursor-grabbing'
+          : activeTool === 'pan' || isSpacePressed
+          ? 'cursor-grab'
+          : 'cursor-default'
+      }`}
     >
-      {/* Floating Canvas Controls */}
+      {/* Floating Canvas Controls: Tool Switcher & Zoom */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-xs p-1.5 rounded-xl shadow-md border border-slate-200">
+        {/* Tool Mode: Select vs Pan */}
+        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg mr-1">
+          <button
+            id="btn-tool-select"
+            onClick={() => setActiveTool('select')}
+            title="Select & Move Tables (V)"
+            className={`p-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition ${
+              activeTool === 'select'
+                ? 'bg-white text-indigo-700 shadow-xs font-semibold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <MousePointer className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Select</span>
+          </button>
+          <button
+            id="btn-tool-pan"
+            onClick={() => setActiveTool('pan')}
+            title="Drag Canvas / Pan View (H or Hold Space)"
+            className={`p-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition ${
+              activeTool === 'pan'
+                ? 'bg-white text-indigo-700 shadow-xs font-semibold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Hand className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Pan</span>
+          </button>
+        </div>
+
+        <div className="h-4 w-px bg-slate-200 mx-0.5" />
+
         <button
           id="btn-zoom-in"
           onClick={handleZoomIn}
@@ -374,27 +637,278 @@ export const Canvas: React.FC<CanvasProps> = ({
         </button>
       </div>
 
-      {/* Floating Quick Stats Pill */}
-      <div className="absolute top-4 left-4 z-20 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-xs px-3.5 py-1.5 rounded-xl shadow-md border border-slate-200 text-xs text-slate-600">
+      {/* Floating Quick Stats Pill & Floor Resize Popover Trigger */}
+      <div className="absolute top-4 left-4 z-20 hidden sm:flex items-center gap-2.5 bg-white/95 backdrop-blur-xs px-3.5 py-1.5 rounded-xl shadow-md border border-slate-200 text-xs text-slate-600">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-indigo-600" />
-          <span>Room: <strong className="text-slate-900">{floorPlan.roomWidth} × {floorPlan.roomHeight} {floorPlan.unit}</strong></span>
+          <span>
+            Room: <strong className="text-slate-900">{floorPlan.roomWidth} × {floorPlan.roomHeight} {floorPlan.unit}</strong>
+          </span>
         </div>
+        <div className="h-3 w-px bg-slate-200" />
+        <button
+          id="btn-open-floor-resize-modal"
+          onClick={() => setIsFloorDimensionModalOpen((prev) => !prev)}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+            isFloorDimensionModalOpen
+              ? 'bg-indigo-600 text-white'
+              : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+          }`}
+          title="Adjust room dimensions or pick venue presets"
+        >
+          <Scaling className="w-3.5 h-3.5" />
+          <span>Resize Floor</span>
+        </button>
         <div className="h-3 w-px bg-slate-200" />
         <div>
           <span>Scale: <strong className="text-slate-900">1 {floorPlan.unit} = 20px</strong></span>
         </div>
       </div>
 
+      {/* Quick Floor Dimensions Popover Modal */}
+      {isFloorDimensionModalOpen && (
+        <div
+          id="floor-dimensions-modal"
+          className="absolute top-14 left-4 z-30 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/90 p-4 select-none"
+        >
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+              <Scaling className="w-4 h-4 text-indigo-600" />
+              <span>Room Dimensions</span>
+            </div>
+            <button
+              onClick={() => setIsFloorDimensionModalOpen(false)}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-3.5 my-3.5">
+            {/* Width Stepper */}
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-semibold text-slate-700">Room Width</span>
+                <span className="font-bold text-indigo-600 text-xs">
+                  {floorPlan.roomWidth} {floorPlan.unit}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomWidth: Math.max(minAllowedWidth, floorPlan.roomWidth - 5)
+                    })
+                  }
+                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold"
+                  title="Minus 5"
+                >
+                  -5
+                </button>
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomWidth: Math.max(minAllowedWidth, floorPlan.roomWidth - 1)
+                    })
+                  }
+                  className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+                  title="Minus 1"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  type="number"
+                  min={minAllowedWidth}
+                  max={250}
+                  value={floorPlan.roomWidth}
+                  onChange={(e) =>
+                    onUpdateFloorPlan?.({
+                      roomWidth: Math.max(minAllowedWidth, Math.min(250, Number(e.target.value) || minAllowedWidth))
+                    })
+                  }
+                  className="w-full text-center py-1 font-bold text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-lg"
+                />
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomWidth: Math.min(250, floorPlan.roomWidth + 1)
+                    })
+                  }
+                  className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+                  title="Plus 1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomWidth: Math.min(250, floorPlan.roomWidth + 5)
+                    })
+                  }
+                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold"
+                  title="Plus 5"
+                >
+                  +5
+                </button>
+              </div>
+            </div>
+
+            {/* Height Stepper */}
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="font-semibold text-slate-700">Room Length (Height)</span>
+                <span className="font-bold text-indigo-600 text-xs">
+                  {floorPlan.roomHeight} {floorPlan.unit}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomHeight: Math.max(minAllowedHeight, floorPlan.roomHeight - 5)
+                    })
+                  }
+                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold"
+                  title="Minus 5"
+                >
+                  -5
+                </button>
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomHeight: Math.max(minAllowedHeight, floorPlan.roomHeight - 1)
+                    })
+                  }
+                  className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+                  title="Minus 1"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <input
+                  type="number"
+                  min={minAllowedHeight}
+                  max={250}
+                  value={floorPlan.roomHeight}
+                  onChange={(e) =>
+                    onUpdateFloorPlan?.({
+                      roomHeight: Math.max(minAllowedHeight, Math.min(250, Number(e.target.value) || minAllowedHeight))
+                    })
+                  }
+                  className="w-full text-center py-1 font-bold text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-lg"
+                />
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomHeight: Math.min(250, floorPlan.roomHeight + 1)
+                    })
+                  }
+                  className="p-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+                  title="Plus 1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() =>
+                    onUpdateFloorPlan?.({
+                      roomHeight: Math.min(250, floorPlan.roomHeight + 5)
+                    })
+                  }
+                  className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold"
+                  title="Plus 5"
+                >
+                  +5
+                </button>
+              </div>
+            </div>
+
+            {/* Area & Capacity Stats */}
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 space-y-1">
+              <div className="flex justify-between">
+                <span>Floor Area:</span>
+                <span className="font-bold text-slate-900">
+                  {(floorPlan.roomWidth * floorPlan.roomHeight).toLocaleString()} sq {floorPlan.unit}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Est. Max Capacity:</span>
+                <span className="font-bold text-indigo-600">
+                  ~{Math.round((floorPlan.roomWidth * floorPlan.roomHeight) / (floorPlan.unit === 'ft' ? 15 : 1.5))} covers
+                </span>
+              </div>
+            </div>
+
+            {/* Standard Presets */}
+            <div>
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block mb-1.5">
+                Standard Venue Presets
+              </span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[
+                  { label: 'Bistro Dining', w: 45, h: 32 },
+                  { label: 'Cozy Cafe', w: 30, h: 22 },
+                  { label: 'Banquet Hall', w: 60, h: 40 },
+                  { label: 'Grand Ballroom', w: 80, h: 50 },
+                  { label: 'Square Patio', w: 40, h: 40 }
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    onClick={() => {
+                      onUpdateFloorPlan?.({
+                        roomWidth: Math.max(minAllowedWidth, preset.w),
+                        roomHeight: Math.max(minAllowedHeight, preset.h)
+                      });
+                    }}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:border-indigo-400 hover:bg-indigo-50/70 text-left transition"
+                  >
+                    <div className="text-xs font-bold text-slate-800">{preset.label}</div>
+                    <div className="text-[10px] text-slate-500 font-mono">
+                      {preset.w} × {preset.h} {floorPlan.unit}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+            <span className="italic">💡 Drag bottom-right corner anytime to resize directly</span>
+          </div>
+        </div>
+      )}
+
       {/* Main SVG Floor Plan Canvas */}
       <div
         style={{
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
           transformOrigin: '0 0',
-          transition: isPanning ? 'none' : 'transform 0.05s ease-out'
+          transition: isPanning || floorResize ? 'none' : 'transform 0.05s ease-out'
         }}
         className="inline-block relative"
       >
+        {/* Draggable Room Canvas Header Bar */}
+        <div
+          id="room-canvas-header-bar"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            setIsPanning(true);
+            setPanStart({
+              x: e.clientX - pan.x,
+              y: e.clientY - pan.y
+            });
+          }}
+          className="absolute -top-10 left-0 flex items-center gap-2.5 bg-slate-900/90 hover:bg-slate-900 backdrop-blur-xs text-white px-3.5 py-1.5 rounded-t-xl text-xs font-semibold shadow-md cursor-grab active:cursor-grabbing select-none border-t border-x border-slate-700/80 transition z-10"
+          title="Click and drag to pan the room canvas anywhere"
+        >
+          <GripHorizontal className="w-4 h-4 text-slate-400 shrink-0" />
+          <span className="font-bold">{floorPlan.name || 'Floor Plan'}</span>
+          <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/30 text-indigo-200 font-mono font-bold">
+            {effectiveRoomWidth} × {effectiveRoomHeight} {floorPlan.unit}
+          </span>
+          <span className="text-[10px] text-slate-400 font-normal hidden sm:inline-flex items-center gap-1 ml-1">
+            <Move className="w-3 h-3 text-indigo-400" /> Drag to move canvas
+          </span>
+        </div>
+
         <svg
           ref={svgRef}
           id="floor-plan-svg"
@@ -422,14 +936,26 @@ export const Canvas: React.FC<CanvasProps> = ({
             </pattern>
           </defs>
 
-          {/* Grid background */}
-          {showGrid && (
-            <rect width={roomWidthPx} height={roomHeightPx} fill="url(#grid-pattern-large)" />
-          )}
+          {/* Room Base Floor Surface (Click & Drag to Pan Canvas) */}
+          <rect
+            id="room-floor-surface"
+            data-floor-surface="true"
+            x="0"
+            y="0"
+            width={roomWidthPx}
+            height={roomHeightPx}
+            fill={showGrid ? "url(#grid-pattern-large)" : "#ffffff"}
+            onPointerDown={handleCanvasBackgroundPointerDown}
+            className={
+              activeTool === 'pan' || isSpacePressed
+                ? 'cursor-grab active:cursor-grabbing'
+                : 'cursor-default'
+            }
+          />
 
           {/* Perimeter measurement guides */}
           <g className="measurement-guides select-none opacity-40">
-            {Array.from({ length: Math.floor(floorPlan.roomWidth / 5) + 1 }).map((_, i) => (
+            {Array.from({ length: Math.floor(effectiveRoomWidth / 5) + 1 }).map((_, i) => (
               <g key={`x-${i}`} transform={`translate(${i * 5 * scaleRatio}, 0)`}>
                 <line x1="0" y1="0" x2="0" y2="10" stroke="#94a3b8" strokeWidth="1.5" />
                 <text x="3" y="18" fontSize="9" fill="#64748b" fontWeight="600">
@@ -437,7 +963,7 @@ export const Canvas: React.FC<CanvasProps> = ({
                 </text>
               </g>
             ))}
-            {Array.from({ length: Math.floor(floorPlan.roomHeight / 5) + 1 }).map((_, i) => (
+            {Array.from({ length: Math.floor(effectiveRoomHeight / 5) + 1 }).map((_, i) => (
               <g key={`y-${i}`} transform={`translate(0, ${i * 5 * scaleRatio})`}>
                 <line x1="0" y1="0" x2="10" y2="0" stroke="#94a3b8" strokeWidth="1.5" />
                 <text x="12" y="12" fontSize="9" fill="#64748b" fontWeight="600">
@@ -824,6 +1350,171 @@ export const Canvas: React.FC<CanvasProps> = ({
               </g>
             );
           })}
+
+          {/* Interactive Floor Canvas Resizing Handles & Guides */}
+          <g id="floor-canvas-resize-controls" className="select-none">
+            {/* Live resize dashed guide perimeter if actively dragging */}
+            {floorResize && (
+              <rect
+                x={0}
+                y={0}
+                width={roomWidthPx}
+                height={roomHeightPx}
+                fill="none"
+                stroke="#6366f1"
+                strokeWidth="3"
+                strokeDasharray="6 4"
+                className="pointer-events-none"
+              />
+            )}
+
+            {/* EAST HANDLE (Right border resize) */}
+            <g
+              id="handle-resize-east"
+              className="cursor-ew-resize group"
+              onPointerDown={(e) => handleFloorResizeStart(e, 'e')}
+            >
+              {/* Generous invisible hit test zone */}
+              <rect
+                x={roomWidthPx - 8}
+                y={0}
+                width={16}
+                height={roomHeightPx}
+                fill="transparent"
+              />
+              {/* Visual edge line indicator on hover/drag */}
+              <line
+                x1={roomWidthPx}
+                y1={0}
+                x2={roomWidthPx}
+                y2={roomHeightPx}
+                stroke="#4f46e5"
+                strokeWidth={floorResize?.direction === 'e' ? 4 : 2}
+                strokeOpacity={floorResize?.direction === 'e' ? 1 : 0.4}
+                className="transition-opacity group-hover:stroke-opacity-100"
+              />
+              {/* East Handle Pill */}
+              <g transform={`translate(${roomWidthPx - 7}, ${roomHeightPx / 2 - 20})`}>
+                <rect
+                  width="14"
+                  height="40"
+                  rx="7"
+                  fill="#ffffff"
+                  stroke="#4f46e5"
+                  strokeWidth="2"
+                  className="shadow-md group-hover:scale-110 transition-transform origin-center"
+                />
+                <line x1="5" y1="14" x2="5" y2="26" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="9" y1="14" x2="9" y2="26" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+              </g>
+            </g>
+
+            {/* SOUTH HANDLE (Bottom border resize) */}
+            <g
+              id="handle-resize-south"
+              className="cursor-ns-resize group"
+              onPointerDown={(e) => handleFloorResizeStart(e, 's')}
+            >
+              {/* Generous invisible hit test zone */}
+              <rect
+                x={0}
+                y={roomHeightPx - 8}
+                width={roomWidthPx}
+                height={16}
+                fill="transparent"
+              />
+              {/* Visual edge line indicator on hover/drag */}
+              <line
+                x1={0}
+                y1={roomHeightPx}
+                x2={roomWidthPx}
+                y2={roomHeightPx}
+                stroke="#4f46e5"
+                strokeWidth={floorResize?.direction === 's' ? 4 : 2}
+                strokeOpacity={floorResize?.direction === 's' ? 1 : 0.4}
+                className="transition-opacity group-hover:stroke-opacity-100"
+              />
+              {/* South Handle Pill */}
+              <g transform={`translate(${roomWidthPx / 2 - 20}, ${roomHeightPx - 7})`}>
+                <rect
+                  width="40"
+                  height="14"
+                  rx="7"
+                  fill="#ffffff"
+                  stroke="#4f46e5"
+                  strokeWidth="2"
+                  className="shadow-md group-hover:scale-110 transition-transform origin-center"
+                />
+                <line x1="14" y1="5" x2="26" y2="5" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="14" y1="9" x2="26" y2="9" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+              </g>
+            </g>
+
+            {/* SOUTH-EAST CORNER HANDLE (Both dimensions resize) */}
+            <g
+              id="handle-resize-southeast"
+              className="cursor-nwse-resize group"
+              onPointerDown={(e) => handleFloorResizeStart(e, 'se')}
+            >
+              {/* Generous invisible hit test circle */}
+              <circle
+                cx={roomWidthPx}
+                cy={roomHeightPx}
+                r={24}
+                fill="transparent"
+              />
+              {/* Corner Badge */}
+              <g transform={`translate(${roomWidthPx - 13}, ${roomHeightPx - 13})`}>
+                <rect
+                  width="26"
+                  height="26"
+                  rx="8"
+                  fill="#4f46e5"
+                  stroke="#ffffff"
+                  strokeWidth="2.5"
+                  className="shadow-lg group-hover:scale-125 transition-transform origin-center"
+                />
+                {/* Diagonal resize arrows icon in white */}
+                <path
+                  d="M 8 18 L 18 8 M 12 8 L 18 8 L 18 14 M 14 18 L 8 18 L 8 12"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+            </g>
+
+            {/* Live Dimensions Overlay HUD while actively resizing */}
+            {floorResize && (
+              <g
+                transform={`translate(${roomWidthPx + 16}, ${roomHeightPx + 16})`}
+                className="pointer-events-none drop-shadow-xl"
+              >
+                <rect
+                  x="0"
+                  y="0"
+                  width="140"
+                  height="54"
+                  rx="10"
+                  fill="#0f172a"
+                  fillOpacity="0.95"
+                  stroke="#6366f1"
+                  strokeWidth="1.5"
+                />
+                <text x="12" y="20" fill="#ffffff" fontSize="12" fontWeight="700">
+                  {effectiveRoomWidth} × {effectiveRoomHeight} {floorPlan.unit}
+                </text>
+                <text x="12" y="36" fill="#94a3b8" fontSize="10">
+                  {(effectiveRoomWidth * effectiveRoomHeight).toLocaleString()} sq {floorPlan.unit}
+                </text>
+                <text x="12" y="47" fill="#818cf8" fontSize="9" fontWeight="600">
+                  Release to apply
+                </text>
+              </g>
+            )}
+          </g>
         </svg>
       </div>
 
@@ -1018,14 +1709,25 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
           )}
 
-          {/* Rotate 45deg */}
+          {/* Rotate 45deg & 90deg */}
           <button
             id="btn-hud-rotate-45"
-            onClick={handleRotateStep}
+            onClick={() => handleRotateStep(45)}
             title="Rotate 45°"
-            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition"
+            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-xs font-semibold flex items-center gap-0.5"
           >
-            <RotateCw className="w-4 h-4" />
+            <RotateCw className="w-3.5 h-3.5" />
+            <span className="text-[10px]">45°</span>
+          </button>
+
+          <button
+            id="btn-hud-rotate-90"
+            onClick={() => handleRotateStep(90)}
+            title="Rotate 90° (Vertical / Horizontal alignment)"
+            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition text-xs font-semibold flex items-center gap-0.5"
+          >
+            <RotateCw className="w-3.5 h-3.5 text-indigo-600" />
+            <span className="text-[10px] text-indigo-600 font-bold">90°</span>
           </button>
 
           {/* Duplicate */}
