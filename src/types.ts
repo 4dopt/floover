@@ -99,3 +99,14 @@ export interface ProjectSummary {
   updatedAt: string;
   version: number;
 }
+
+export interface MarketingQuestionnaireData {
+  venueType: string;
+  role: string;
+  primaryChallenge: string;
+  capacityRange: string;
+  referralSource: string;
+  businessName?: string;
+  email?: string;
+  submittedAt: string;
+}

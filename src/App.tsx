@@ -7,6 +7,8 @@ import { TemplatesModal } from './components/TemplatesModal';
 import { CollaborationModal } from './components/CollaborationModal';
 import { ExportModal } from './components/ExportModal';
 import { NewPlanModal } from './components/NewPlanModal';
+import { LandingPage } from './components/LandingPage';
+import { MarketingQuestionnaireModal } from './components/MarketingQuestionnaireModal';
 import { FloorPlan, FloorElement, FurniturePreset, RoomTemplate, ProjectSummary } from './types';
 import { useRealtime } from './hooks/useRealtime';
 import { FURNITURE_PRESETS } from './data/furniturePresets';
@@ -194,7 +196,8 @@ const DEFAULT_FLOOR_PLAN: FloorPlan = {
 };
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'editor' | 'dashboard' | 'templates'>('editor');
+  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates'>('landing');
+  const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
   const [floorPlan, setFloorPlan] = useState<FloorPlan>(DEFAULT_FLOOR_PLAN);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
 
@@ -216,12 +219,16 @@ export default function App() {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isNewPlanModalOpen, setIsNewPlanModalOpen] = useState(false);
 
-  // Check URL query for project id on mount
+  // Check URL query on mount (e.g. ?project=xyz or ?view=editor)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projId = params.get('project');
+    const viewParam = params.get('view');
     if (projId && projId !== floorPlan.id) {
       loadProjectById(projId);
+      setActiveView('editor');
+    } else if (viewParam === 'editor' || viewParam === 'dashboard' || viewParam === 'templates') {
+      setActiveView(viewParam);
     }
   }, []);
 
@@ -560,6 +567,23 @@ export default function App() {
     window.history.pushState({}, '', url.toString());
   };
 
+  // Handle Questionnaire Flow
+  const handleGetStartedFromLanding = () => {
+    setIsQuestionnaireOpen(true);
+  };
+
+  const handleQuestionnaireComplete = (recommendedTemplateId?: string) => {
+    setIsQuestionnaireOpen(false);
+    if (recommendedTemplateId) {
+      const tmpl = ROOM_TEMPLATES.find((t) => t.id === recommendedTemplateId);
+      if (tmpl) {
+        handleApplyTemplate(tmpl);
+        return;
+      }
+    }
+    setActiveView('editor');
+  };
+
   // Duplicate a project
   const handleDuplicateProject = async (id: string) => {
     try {
@@ -653,6 +677,35 @@ export default function App() {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [floorPlan]);
+
+  // Landing Page View
+  if (activeView === 'landing') {
+    return (
+      <div id="floover-landing-container" className="min-h-screen bg-white text-slate-900 flex flex-col font-sans">
+        <LandingPage
+          onGetStarted={handleGetStartedFromLanding}
+          onOpenEditor={(templateId) => {
+            if (templateId) {
+              const tmpl = ROOM_TEMPLATES.find((t) => t.id === templateId);
+              if (tmpl) {
+                handleApplyTemplate(tmpl);
+                return;
+              }
+            }
+            setActiveView('editor');
+          }}
+          onOpenDashboard={() => setActiveView('dashboard')}
+          onOpenTemplates={() => setActiveView('templates')}
+        />
+
+        <MarketingQuestionnaireModal
+          isOpen={isQuestionnaireOpen}
+          onClose={() => setIsQuestionnaireOpen(false)}
+          onComplete={handleQuestionnaireComplete}
+        />
+      </div>
+    );
+  }
 
   return (
     <div id="app-root-container" className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans">
@@ -770,6 +823,13 @@ export default function App() {
           setIsNewPlanModalOpen(false);
           setActiveView('templates');
         }}
+      />
+
+      {/* 6. Marketing Questionnaire Dialog */}
+      <MarketingQuestionnaireModal
+        isOpen={isQuestionnaireOpen}
+        onClose={() => setIsQuestionnaireOpen(false)}
+        onComplete={handleQuestionnaireComplete}
       />
     </div>
   );

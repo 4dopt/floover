@@ -14,6 +14,7 @@ app.use(express.json({ limit: '10mb' }));
 // Persistence directory
 const DATA_DIR = path.join(process.cwd(), 'data');
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
+const LEADS_FILE = path.join(DATA_DIR, 'marketing_leads.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -465,6 +466,39 @@ app.post('/api/projects/:id/duplicate', (req, res) => {
   projectsCache.unshift(duplicated);
   saveProjects(projectsCache);
   res.status(201).json({ project: duplicated });
+});
+
+// ==================== MARKETING LEADS API ====================
+let marketingLeadsCache: any[] = [];
+try {
+  if (fs.existsSync(LEADS_FILE)) {
+    marketingLeadsCache = JSON.parse(fs.readFileSync(LEADS_FILE, 'utf-8'));
+  }
+} catch (e) {
+  marketingLeadsCache = [];
+}
+
+function saveMarketingLeads(leads: any[]) {
+  try {
+    fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to save marketing leads', err);
+  }
+}
+
+app.post('/api/marketing/leads', (req, res) => {
+  const leadData = {
+    ...req.body,
+    id: `lead-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    receivedAt: new Date().toISOString()
+  };
+  marketingLeadsCache.unshift(leadData);
+  saveMarketingLeads(marketingLeadsCache);
+  res.status(201).json({ success: true, lead: leadData });
+});
+
+app.get('/api/marketing/leads', (req, res) => {
+  res.json({ leads: marketingLeadsCache });
 });
 
 // ==================== REAL-TIME WEBSOCKETS ====================

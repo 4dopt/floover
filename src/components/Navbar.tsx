@@ -13,15 +13,16 @@ import {
   Ruler,
   Share2,
   FolderOpen,
-  Plus
+  Plus,
+  Home
 } from 'lucide-react';
 import { Collaborator, FloorPlan } from '../types';
 import { getEffectiveCovers } from '../utils/chairLayout';
 import { FlooverLogo } from './FlooverLogo';
 
 interface NavbarProps {
-  activeView: 'editor' | 'dashboard' | 'templates';
-  setActiveView: (view: 'editor' | 'dashboard' | 'templates') => void;
+  activeView: 'landing' | 'editor' | 'dashboard' | 'templates';
+  setActiveView: (view: 'landing' | 'editor' | 'dashboard' | 'templates') => void;
   floorPlan: FloorPlan;
   onNewProject: () => void;
   onSaveProject: () => void;
@@ -74,8 +75,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div
           id="navbar-brand-button"
           className="flex items-center gap-2.5 cursor-pointer group"
-          onClick={() => setActiveView('editor')}
-          title="Floover - Floor Plan & Covers Studio"
+          onClick={() => setActiveView('landing')}
+          title="Floover - Home & Overview"
         >
           <FlooverLogo size="md" showWordmark={true} showBadge={true} />
           <div className="hidden lg:block border-l border-slate-200 pl-3">
@@ -87,6 +88,19 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* View Switcher Tabs */}
         <div className="hidden md:flex items-center bg-slate-100 p-1 rounded-lg ml-3 border border-slate-200/80">
+          <button
+            id="nav-tab-landing"
+            onClick={() => setActiveView('landing')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              activeView === 'landing'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Floover Overview & Landing"
+          >
+            <Home className="w-3.5 h-3.5 text-indigo-600" />
+            Home
+          </button>
           <button
             id="nav-tab-editor"
             onClick={() => setActiveView('editor')}
