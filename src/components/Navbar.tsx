@@ -14,15 +14,17 @@ import {
   Share2,
   FolderOpen,
   Plus,
-  Home
+  Home,
+  Tag,
+  Crown
 } from 'lucide-react';
-import { Collaborator, FloorPlan } from '../types';
+import { Collaborator, FloorPlan, PricingPlanId } from '../types';
 import { getEffectiveCovers } from '../utils/chairLayout';
-import { FlooverLogo } from './FlooverLogo';
+import { FloordoneLogo } from './FloordoneLogo';
 
 interface NavbarProps {
-  activeView: 'landing' | 'editor' | 'dashboard' | 'templates';
-  setActiveView: (view: 'landing' | 'editor' | 'dashboard' | 'templates') => void;
+  activeView: 'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing';
+  setActiveView: (view: 'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing') => void;
   floorPlan: FloorPlan;
   onNewProject: () => void;
   onSaveProject: () => void;
@@ -40,6 +42,7 @@ interface NavbarProps {
   currentUser: Collaborator;
   onOpenCollaboration: () => void;
   onOpenExport: () => void;
+  userPlan?: PricingPlanId;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -61,7 +64,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   collaborators,
   currentUser,
   onOpenCollaboration,
-  onOpenExport
+  onOpenExport,
+  userPlan = 'free'
 }) => {
   const tableCount = floorPlan.elements.filter((e) => e.type === 'table').length;
   const totalCovers = floorPlan.elements
@@ -76,9 +80,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           id="navbar-brand-button"
           className="flex items-center gap-2.5 cursor-pointer group"
           onClick={() => setActiveView('landing')}
-          title="Floover - Home & Overview"
+          title="Floordone - Home & Overview"
         >
-          <FlooverLogo size="md" showWordmark={true} showBadge={true} />
+          <FloordoneLogo size="md" showWordmark={true} />
           <div className="hidden lg:block border-l border-slate-200 pl-3">
             <p className="text-xs text-slate-500 font-medium truncate max-w-[200px] xl:max-w-[280px]">
               {floorPlan.name} • <span className="text-slate-700 font-semibold">{tableCount}</span> tables ({totalCovers} seats)
@@ -96,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
-            title="Floover Overview & Landing"
+            title="Floordone Overview & Landing"
           >
             <Home className="w-3.5 h-3.5 text-indigo-600" />
             Home
@@ -136,6 +140,22 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             Templates
+          </button>
+          <button
+            id="nav-tab-pricing"
+            onClick={() => setActiveView('pricing')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              activeView === 'pricing'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+            title="Pricing Plans (From $1.19/mo)"
+          >
+            <Tag className="w-3.5 h-3.5 text-emerald-600" />
+            Pricing
+            <span className="hidden xl:inline-block px-1.5 py-0.5 rounded text-[9.5px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              $1.19/mo
+            </span>
           </button>
         </div>
 
@@ -254,6 +274,47 @@ export const Navbar: React.FC<NavbarProps> = ({
             {collaborators.length + 1}
           </span>
           <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-100 animate-pulse" />
+        </button>
+
+        {/* User Plan Badge */}
+        <button
+          id="btn-user-plan-badge"
+          onClick={() => setActiveView('pricing')}
+          className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
+            userPlan === 'lifetime'
+              ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              : userPlan === 'pro'
+              ? 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100'
+              : userPlan === 'solo'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+              : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+          }`}
+          title="Manage Plan & Billing (Plans start at $1.19/mo)"
+        >
+          {userPlan === 'lifetime' ? (
+            <>
+              <Crown className="w-3.5 h-3.5 text-amber-600" />
+              <span>Lifetime Pass</span>
+            </>
+          ) : userPlan === 'pro' ? (
+            <>
+              <Crown className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Pro Studio</span>
+            </>
+          ) : userPlan === 'solo' ? (
+            <>
+              <Tag className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Solo Plan</span>
+            </>
+          ) : (
+            <>
+              <Tag className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Upgrade</span>
+              <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-100/80 px-1 rounded">
+                $1.19
+              </span>
+            </>
+          )}
         </button>
 
         {/* Export PDF */}

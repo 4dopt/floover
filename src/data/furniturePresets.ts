@@ -205,9 +205,10 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     defaultCovers: 6,
     defaultWidth: 260,
     defaultHeight: 54,
-    description: 'Full liquor & cocktail service counter with stools',
+    description: 'Full liquor & cocktail service counter with brass rail and stools',
     icon: 'Wine',
-    defaultColor: '#1e293b'
+    defaultColor: '#1e293b',
+    subtype: 'fixture-bar'
   },
   {
     id: 'preset-buffet-counter',
@@ -218,9 +219,24 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     defaultCovers: 0,
     defaultWidth: 180,
     defaultHeight: 52,
-    description: 'Chafing dishes & self-serve catering table',
+    description: 'Chafing dishes & self-serve catering service table',
     icon: 'Utensils',
-    defaultColor: '#334155'
+    defaultColor: '#334155',
+    subtype: 'fixture-buffet'
+  },
+  {
+    id: 'preset-kitchen-pass',
+    name: "Kitchen Pass / Chef's Window",
+    category: 'fixtures',
+    type: 'fixture',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 120,
+    defaultHeight: 34,
+    description: 'Order expeditor pickup counter with heat lamps',
+    icon: 'ChefHat',
+    defaultColor: '#475569',
+    subtype: 'fixture-kitchen'
   },
   {
     id: 'preset-host-stand',
@@ -229,11 +245,12 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     type: 'fixture',
     shape: 'square',
     defaultCovers: 0,
-    defaultWidth: 42,
-    defaultHeight: 42,
+    defaultWidth: 44,
+    defaultHeight: 44,
     description: 'Front entrance greeting and reservation podium',
     icon: 'UserCheck',
-    defaultColor: '#475569'
+    defaultColor: '#475569',
+    subtype: 'fixture-host'
   },
   {
     id: 'preset-pos-station',
@@ -244,9 +261,10 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     defaultCovers: 0,
     defaultWidth: 54,
     defaultHeight: 38,
-    description: 'Order input, water pitcher, and cutlery station',
+    description: 'Order terminal, water pitcher, and cutlery station',
     icon: 'Laptop',
-    defaultColor: '#64748b'
+    defaultColor: '#64748b',
+    subtype: 'fixture-pos'
   },
   {
     id: 'preset-stage',
@@ -257,9 +275,10 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     defaultCovers: 0,
     defaultWidth: 260,
     defaultHeight: 110,
-    description: 'Elevated platform for bands, speeches, and presentations',
+    description: 'Elevated platform for live bands, speeches, and presentations',
     icon: 'Mic',
-    defaultColor: '#0f172a'
+    defaultColor: '#0f172a',
+    subtype: 'fixture-stage'
   },
   {
     id: 'preset-dance-floor',
@@ -272,7 +291,8 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     defaultHeight: 180,
     description: 'Polished parquet dance space for weddings & galas',
     icon: 'Music',
-    defaultColor: '#fef3c7'
+    defaultColor: '#fef3c7',
+    subtype: 'fixture-dance-floor'
   },
   {
     id: 'preset-dj-booth',
@@ -283,63 +303,96 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     defaultCovers: 0,
     defaultWidth: 80,
     defaultHeight: 50,
-    description: 'Audio mixer, decks, and DJ setup area',
+    description: 'Audio mixer, decks, and DJ setup station',
     icon: 'Disc',
-    defaultColor: '#1e1b4b'
+    defaultColor: '#1e1b4b',
+    subtype: 'fixture-dj'
   },
 
-  // --- ARCHITECTURAL ---
+  // --- WALLS & ARCHITECTURAL ---
   {
-    id: 'preset-entrance-double',
-    name: 'Double Glass Entrance',
-    category: 'architectural',
-    type: 'architectural',
-    shape: 'rectangle',
-    defaultCovers: 0,
-    defaultWidth: 100,
-    defaultHeight: 20,
-    description: 'Main guest double-swing entryway',
-    icon: 'DoorOpen',
-    defaultColor: '#3b82f6'
-  },
-  {
-    id: 'preset-entrance-single',
-    name: 'Single Door',
-    category: 'architectural',
-    type: 'architectural',
-    shape: 'rectangle',
-    defaultCovers: 0,
-    defaultWidth: 54,
-    defaultHeight: 18,
-    description: 'Kitchen or service door entrance',
-    icon: 'DoorClosed',
-    defaultColor: '#64748b'
-  },
-  {
-    id: 'preset-wall-divider',
-    name: 'Acoustic Partition Wall',
+    id: 'preset-wall-solid',
+    name: 'Interior Solid Wall (8ft)',
     category: 'architectural',
     type: 'architectural',
     shape: 'rectangle',
     defaultCovers: 0,
     defaultWidth: 160,
-    defaultHeight: 14,
-    description: 'Modular room divider or privacy barrier',
+    defaultHeight: 16,
+    description: 'Structural drywall boundary partition with architectural hatch',
     icon: 'Columns3',
-    defaultColor: '#94a3b8'
+    defaultColor: '#1e293b',
+    subtype: 'wall-solid'
+  },
+  {
+    id: 'preset-wall-short',
+    name: 'Partition Wall (4ft)',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 80,
+    defaultHeight: 16,
+    description: 'Compact interior partition segment for room division',
+    icon: 'Columns3',
+    defaultColor: '#1e293b',
+    subtype: 'wall-solid'
+  },
+  {
+    id: 'preset-wall-glass',
+    name: 'Glass Partition Wall',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 140,
+    defaultHeight: 14,
+    description: 'Frameless modern glass divider with steel standoffs',
+    icon: 'PanelsTopLeft',
+    defaultColor: '#0284c7',
+    subtype: 'wall-glass'
+  },
+  {
+    id: 'preset-wall-half',
+    name: 'Dining Half-Wall / Divider',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 120,
+    defaultHeight: 14,
+    description: 'Low dining booth barrier with finished wood cap trim',
+    icon: 'Split',
+    defaultColor: '#78716c',
+    subtype: 'wall-half'
   },
   {
     id: 'preset-pillar',
-    name: 'Structural Support Pillar',
+    name: 'Square Structural Pillar',
     category: 'architectural',
     type: 'architectural',
     shape: 'square',
     defaultCovers: 0,
     defaultWidth: 32,
     defaultHeight: 32,
-    description: 'Architectural column / support beam',
+    description: 'Load-bearing concrete column with center cross mark',
     icon: 'Box',
-    defaultColor: '#475569'
+    defaultColor: '#334155',
+    subtype: 'column-square'
+  },
+  {
+    id: 'preset-pillar-round',
+    name: 'Round Concrete Column',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'round',
+    defaultCovers: 0,
+    defaultWidth: 32,
+    defaultHeight: 32,
+    description: 'Round architectural pillar with concentric concrete rings',
+    icon: 'Circle',
+    defaultColor: '#475569',
+    subtype: 'column-round'
   },
   {
     id: 'preset-restrooms',
@@ -348,26 +401,228 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     type: 'architectural',
     shape: 'rectangle',
     defaultCovers: 0,
-    defaultWidth: 70,
+    defaultWidth: 80,
     defaultHeight: 44,
-    description: 'Guest restroom hallway indicator',
-    icon: 'User',
-    defaultColor: '#0284c7'
+    description: 'Guest restroom hallway indicator with gender & accessible icons',
+    icon: 'Users',
+    defaultColor: '#0284c7',
+    subtype: 'fixture-restrooms'
   },
 
-  // --- DECOR ---
+  // --- DOORS & OPENINGS ---
   {
-    id: 'preset-planter',
-    name: 'Greenery Planter Box',
+    id: 'preset-entrance-single',
+    name: 'Single Swing Door',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 60,
+    defaultHeight: 40,
+    description: 'Single hinged door with 90° clearance swing arc',
+    icon: 'DoorClosed',
+    defaultColor: '#475569',
+    subtype: 'door-single'
+  },
+  {
+    id: 'preset-entrance-double',
+    name: 'Double Swing Entry Door',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 100,
+    defaultHeight: 50,
+    description: 'Grand main double-swing entryway with dual swing arcs',
+    icon: 'DoorOpen',
+    defaultColor: '#3b82f6',
+    subtype: 'door-double'
+  },
+  {
+    id: 'preset-door-sliding',
+    name: 'Sliding Glass Door',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 100,
+    defaultHeight: 22,
+    description: 'Patio sliding glass doors with dual track glides',
+    icon: 'ChevronsLeftRight',
+    defaultColor: '#0ea5e9',
+    subtype: 'door-sliding'
+  },
+  {
+    id: 'preset-door-emergency',
+    name: 'Emergency Fire Exit',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 64,
+    defaultHeight: 42,
+    description: 'Fire egress exit door with glowing green safety marking',
+    icon: 'AlertTriangle',
+    defaultColor: '#16a34a',
+    subtype: 'door-emergency'
+  },
+  {
+    id: 'preset-door-archway',
+    name: 'Open Archway / Cased Portal',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 70,
+    defaultHeight: 18,
+    description: 'Wall opening without a door panel for free foot-traffic flow',
+    icon: 'Maximize2',
+    defaultColor: '#94a3b8',
+    subtype: 'opening-arch'
+  },
+  {
+    id: 'preset-window-exterior',
+    name: 'Exterior Window (5ft)',
+    category: 'architectural',
+    type: 'architectural',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 100,
+    defaultHeight: 16,
+    description: 'Architectural window with double glass glazing and exterior sill',
+    icon: 'Grid',
+    defaultColor: '#38bdf8',
+    subtype: 'window-exterior'
+  },
+
+  // --- DECKS & OUTDOOR ---
+  {
+    id: 'preset-deck-wood',
+    name: 'Outdoor Wood Deck',
+    category: 'outdoor',
+    type: 'fixture',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 180,
+    defaultHeight: 140,
+    description: 'Cedar & teak outdoor wooden plank decking platform',
+    icon: 'Layers',
+    defaultColor: '#d97706',
+    subtype: 'deck-wood'
+  },
+  {
+    id: 'preset-deck-patio',
+    name: 'Stone Patio Terrace',
+    category: 'outdoor',
+    type: 'fixture',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 160,
+    defaultHeight: 130,
+    description: 'Slate paver patio flooring for alfresco dining',
+    icon: 'LayoutGrid',
+    defaultColor: '#78716c',
+    subtype: 'deck-stone'
+  },
+  {
+    id: 'preset-umbrella',
+    name: 'Patio Cantilever Umbrella',
+    category: 'outdoor',
+    type: 'decor',
+    shape: 'round',
+    defaultCovers: 0,
+    defaultWidth: 84,
+    defaultHeight: 84,
+    description: 'Large octagonal sun shade umbrella with radial frame ribs',
+    icon: 'Sun',
+    defaultColor: '#f59e0b',
+    subtype: 'outdoor-umbrella'
+  },
+  {
+    id: 'preset-pergola',
+    name: 'Timber Shade Pergola',
+    category: 'outdoor',
+    type: 'fixture',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 160,
+    defaultHeight: 120,
+    description: 'Architectural slatted open-beam timber pergola canopy',
+    icon: 'Grid3X3',
+    defaultColor: '#92400e',
+    subtype: 'outdoor-pergola'
+  },
+
+  // --- PLANTS & BOTANICAL DECOR ---
+  {
+    id: 'preset-plant-potted',
+    name: 'Potted Ficus / Ornamental Tree',
+    category: 'decor',
+    type: 'decor',
+    shape: 'round',
+    defaultCovers: 0,
+    defaultWidth: 46,
+    defaultHeight: 46,
+    description: 'Circular ceramic planter with lush layered botanical foliage',
+    icon: 'Trees',
+    defaultColor: '#16a34a',
+    subtype: 'plant-potted'
+  },
+  {
+    id: 'preset-plant-palm',
+    name: 'Tropical Palm / Monstera',
+    category: 'decor',
+    type: 'decor',
+    shape: 'round',
+    defaultCovers: 0,
+    defaultWidth: 56,
+    defaultHeight: 56,
+    description: 'Expansive tropical palm with radiating botanical fronds',
+    icon: 'Sprout',
+    defaultColor: '#15803d',
+    subtype: 'plant-palm'
+  },
+  {
+    id: 'preset-plant-planter',
+    name: 'Greenery Planter Box Divider',
     category: 'decor',
     type: 'decor',
     shape: 'rectangle',
     defaultCovers: 0,
-    defaultWidth: 90,
+    defaultWidth: 120,
     defaultHeight: 28,
-    description: 'Natural aesthetic room divider with lush plants',
+    description: 'Natural room partition trough with dense green hedge bushes',
     icon: 'Trees',
-    defaultColor: '#15803d'
+    defaultColor: '#15803d',
+    subtype: 'plant-box'
+  },
+  {
+    id: 'preset-plant-planter-square',
+    name: 'Square Planter Pot',
+    category: 'decor',
+    type: 'decor',
+    shape: 'square',
+    defaultCovers: 0,
+    defaultWidth: 38,
+    defaultHeight: 38,
+    description: 'Modern square architectural plant box',
+    icon: 'Trees',
+    defaultColor: '#15803d',
+    subtype: 'plant-box'
+  },
+  {
+    id: 'preset-plant-green-wall',
+    name: 'Living Greenery / Moss Wall',
+    category: 'decor',
+    type: 'decor',
+    shape: 'rectangle',
+    defaultCovers: 0,
+    defaultWidth: 140,
+    defaultHeight: 20,
+    description: 'Vertical acoustic botanical green wall panel',
+    icon: 'Leaf',
+    defaultColor: '#166534',
+    subtype: 'plant-green-wall'
   },
   {
     id: 'preset-photo-backdrop',
@@ -376,10 +631,11 @@ export const FURNITURE_PRESETS: FurniturePreset[] = [
     type: 'decor',
     shape: 'rectangle',
     defaultCovers: 0,
-    defaultWidth: 110,
-    defaultHeight: 26,
-    description: 'Event photo-op wall and wedding floral arch',
+    defaultWidth: 120,
+    defaultHeight: 28,
+    description: 'Event photo-op wall and wedding floral arch with rose accents',
     icon: 'Camera',
-    defaultColor: '#ec4899'
+    defaultColor: '#ec4899',
+    subtype: 'decor-photo-backdrop'
   }
 ];

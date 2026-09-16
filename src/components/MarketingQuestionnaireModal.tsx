@@ -23,7 +23,7 @@ import {
   Share2,
   Rocket
 } from 'lucide-react';
-import { FlooverLogo } from './FlooverLogo';
+import { FloordoneLogo } from './FloordoneLogo';
 import { MarketingQuestionnaireData } from '../types';
 
 interface MarketingQuestionnaireModalProps {
@@ -87,6 +87,8 @@ export const MarketingQuestionnaireModal: React.FC<MarketingQuestionnaireModalPr
 
     try {
       // Save locally
+      localStorage.setItem('floordone_marketing_lead', JSON.stringify(leadData));
+      localStorage.setItem('floordone_onboarding_completed', 'true');
       localStorage.setItem('floover_marketing_lead', JSON.stringify(leadData));
       localStorage.setItem('floover_onboarding_completed', 'true');
 
@@ -120,6 +122,7 @@ export const MarketingQuestionnaireModal: React.FC<MarketingQuestionnaireModalPr
   };
 
   const handleSkipToDesigner = () => {
+    localStorage.setItem('floordone_onboarding_completed', 'true');
     localStorage.setItem('floover_onboarding_completed', 'true');
     const recommendedId = getRecommendedTemplateId(venueType);
     onComplete(recommendedId);
@@ -137,7 +140,7 @@ export const MarketingQuestionnaireModal: React.FC<MarketingQuestionnaireModalPr
         {/* Top Header Bar */}
         <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/70">
           <div className="flex items-center gap-3">
-            <FlooverLogo size="sm" showBadge={false} />
+            <FloordoneLogo size="sm" showBadge={false} />
             <div>
               <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">
                 Personalized Onboarding
@@ -351,7 +354,7 @@ export const MarketingQuestionnaireModal: React.FC<MarketingQuestionnaireModalPr
                   What is your biggest floor planning challenge?
                 </h3>
                 <p className="text-sm text-slate-500 mt-1">
-                  Floover is designed to solve hospitality friction. Select your main focus:
+                  Floordone is designed to solve hospitality friction. Select your main focus:
                 </p>
               </div>
 
@@ -497,7 +500,7 @@ export const MarketingQuestionnaireModal: React.FC<MarketingQuestionnaireModalPr
                   Marketing Insights
                 </span>
                 <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                  How did you hear about Floover?
+                  How did you hear about Floordone?
                 </h3>
                 <p className="text-sm text-slate-500 mt-1">
                   Helps our design team know where to share new templates and updates.
@@ -552,7 +555,7 @@ export const MarketingQuestionnaireModal: React.FC<MarketingQuestionnaireModalPr
                   Your Studio Workspace is Ready!
                 </h3>
                 <p className="text-sm text-slate-600 mt-1 max-w-md mx-auto">
-                  We have configured your Floover canvas with best-practice table presets and clearances for{' '}
+                  We have configured your Floordone canvas with best-practice table presets and clearances for{' '}
                   <strong className="text-indigo-700 capitalize">
                     {venueType.replace(/_/g, ' ')}
                   </strong>

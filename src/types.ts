@@ -23,6 +23,7 @@ export interface FloorElement {
   category?: string;
   iconName?: string;
   removedChairs?: number[]; // indices of chairs removed/hidden from this table
+  subtype?: string; // specific architectural/decor subtype (e.g. wall-solid, door-single, plant-potted, deck-wood)
 }
 
 export interface FloorPlan {
@@ -72,7 +73,7 @@ export interface RoomTemplate {
 export interface FurniturePreset {
   id: string;
   name: string;
-  category: 'tables' | 'seating' | 'fixtures' | 'architectural' | 'decor';
+  category: 'tables' | 'seating' | 'fixtures' | 'architectural' | 'decor' | 'outdoor';
   type: ElementType;
   shape: TableShape;
   defaultCovers: number;
@@ -81,6 +82,7 @@ export interface FurniturePreset {
   description: string;
   icon: string;
   defaultColor?: string;
+  subtype?: string;
 }
 
 export interface ProjectSummary {
@@ -110,3 +112,5 @@ export interface MarketingQuestionnaireData {
   email?: string;
   submittedAt: string;
 }
+
+export type PricingPlanId = 'free' | 'solo' | 'pro' | 'lifetime';

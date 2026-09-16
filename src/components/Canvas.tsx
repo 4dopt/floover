@@ -37,6 +37,7 @@ import {
   clampElementPosition,
   dragClampElementPosition
 } from '../utils/geometry';
+import { ArchitecturalElementRenderer, getElementSubtype } from './ArchitecturalElementRenderer';
 
 interface CanvasProps {
   floorPlan: FloorPlan;
@@ -934,6 +935,46 @@ export const Canvas: React.FC<CanvasProps> = ({
               <rect x="0" y="0" width="20" height="20" fill="#fde68a" opacity="0.3" />
               <rect x="20" y="20" width="20" height="20" fill="#fde68a" opacity="0.3" />
             </pattern>
+
+            {/* Architectural wall diagonal hatching pattern */}
+            <pattern id="wall-hatch" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <rect width="8" height="8" fill="#1e293b" />
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#334155" strokeWidth="2.5" />
+            </pattern>
+
+            {/* Glass sheen gradient */}
+            <linearGradient id="glass-gradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#bae6fd" stopOpacity="0.4" />
+              <stop offset="50%" stopColor="#e0f2fe" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="#7dd3fc" stopOpacity="0.4" />
+            </linearGradient>
+
+            {/* Wood plank decking pattern */}
+            <pattern id="wood-deck-pattern" width="60" height="24" patternUnits="userSpaceOnUse">
+              <rect width="60" height="24" fill="#d97706" fillOpacity="0.25" />
+              <line x1="0" y1="12" x2="60" y2="12" stroke="#92400e" strokeWidth="1" strokeOpacity="0.6" />
+              <line x1="0" y1="24" x2="60" y2="24" stroke="#92400e" strokeWidth="1" strokeOpacity="0.6" />
+              <line x1="30" y1="0" x2="30" y2="12" stroke="#92400e" strokeWidth="1" strokeOpacity="0.4" />
+              <line x1="60" y1="12" x2="60" y2="24" stroke="#92400e" strokeWidth="1" strokeOpacity="0.4" />
+            </pattern>
+
+            {/* Stone patio paver pattern */}
+            <pattern id="stone-patio-pattern" width="36" height="36" patternUnits="userSpaceOnUse">
+              <rect width="36" height="36" fill="#f1f5f9" />
+              <rect x="1" y="1" width="16" height="16" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="1" />
+              <rect x="19" y="1" width="16" height="16" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="1" />
+              <rect x="1" y="19" width="16" height="16" fill="#cbd5e1" stroke="#94a3b8" strokeWidth="1" />
+              <rect x="19" y="19" width="16" height="16" fill="#e2e8f0" stroke="#cbd5e1" strokeWidth="1" />
+            </pattern>
+
+            {/* Green living moss wall pattern */}
+            <pattern id="green-wall-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+              <rect width="20" height="20" fill="#15803d" />
+              <circle cx="5" cy="5" r="4" fill="#16a34a" />
+              <circle cx="15" cy="15" r="5" fill="#22c55e" fillOpacity="0.7" />
+              <circle cx="15" cy="5" r="3" fill="#14532d" />
+              <circle cx="5" cy="15" r="3.5" fill="#15803d" />
+            </pattern>
           </defs>
 
           {/* Room Base Floor Surface (Click & Drag to Pan Canvas) */}
@@ -977,6 +1018,8 @@ export const Canvas: React.FC<CanvasProps> = ({
           {floorPlan.elements.map((el) => {
             const isSelected = el.id === selectedElementId;
             const isTable = el.type === 'table';
+            const architecturalSubtype = !isTable ? getElementSubtype(el) : '';
+            const isArchitectural = Boolean(architecturalSubtype);
             const chairs = isTable ? getChairPositions(el.shape, el.width, el.height, el.covers) : [];
             const effectiveCovers = isTable ? getEffectiveCovers(el.covers, el.removedChairs) : 0;
 
@@ -1098,7 +1141,15 @@ export const Canvas: React.FC<CanvasProps> = ({
                 })}
 
                 {/* 2. Main Element Body */}
-                {el.shape === 'round' ? (
+                {isArchitectural ? (
+                  <ArchitecturalElementRenderer
+                    element={el}
+                    isSelected={isSelected}
+                    remoteSelector={remoteSelector}
+                    statusConfig={statusConfig}
+                    effectiveCovers={effectiveCovers}
+                  />
+                ) : el.shape === 'round' ? (
                   <circle
                     r={el.width / 2}
                     fill={el.color || (isTable ? statusConfig.bg : '#f8fafc')}
@@ -1200,50 +1251,52 @@ export const Canvas: React.FC<CanvasProps> = ({
                   />
                 )}
 
-                {/* 3. Text Label & Covers Badge */}
-                <g className="select-none pointer-events-none text-center">
-                  {/* Table / Element Name */}
-                  <text
-                    x="0"
-                    y={isTable && el.covers > 0 ? -4 : 4}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={Math.min(12, Math.max(9, el.width / 7))}
-                    fontWeight="700"
-                    fill={el.type === 'fixture' && el.color ? '#ffffff' : '#0f172a'}
-                  >
-                    {el.name}
-                  </text>
-
-                  {/* Covers Count Badge */}
-                  {isTable && el.covers > 0 && (
+                {/* 3. Text Label & Covers Badge (For standard non-architectural elements) */}
+                {!isArchitectural && (
+                  <g className="select-none pointer-events-none text-center">
+                    {/* Table / Element Name */}
                     <text
                       x="0"
-                      y="11"
+                      y={isTable && el.covers > 0 ? -4 : 4}
                       textAnchor="middle"
                       dominantBaseline="middle"
-                      fontSize="9.5"
-                      fontWeight="600"
-                      fill={statusConfig.stroke}
+                      fontSize={Math.min(12, Math.max(9, el.width / 7))}
+                      fontWeight="700"
+                      fill={el.type === 'fixture' && el.color ? '#ffffff' : '#0f172a'}
                     >
-                      {effectiveCovers !== el.covers ? `${effectiveCovers}/${el.covers} seats` : `${el.covers} seats`}
+                      {el.name}
                     </text>
-                  )}
 
-                  {/* Guest Name snippet */}
-                  {el.guestName && (
-                    <text
-                      x="0"
-                      y={el.height / 2 + 14}
-                      textAnchor="middle"
-                      fontSize="9"
-                      fontWeight="600"
-                      fill="#475569"
-                    >
-                      👤 {el.guestName}
-                    </text>
-                  )}
-                </g>
+                    {/* Covers Count Badge */}
+                    {isTable && el.covers > 0 && (
+                      <text
+                        x="0"
+                        y="11"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontSize="9.5"
+                        fontWeight="600"
+                        fill={statusConfig.stroke}
+                      >
+                        {effectiveCovers !== el.covers ? `${effectiveCovers}/${el.covers} seats` : `${el.covers} seats`}
+                      </text>
+                    )}
+
+                    {/* Guest Name snippet */}
+                    {el.guestName && (
+                      <text
+                        x="0"
+                        y={el.height / 2 + 14}
+                        textAnchor="middle"
+                        fontSize="9"
+                        fontWeight="600"
+                        fill="#475569"
+                      >
+                        👤 {el.guestName}
+                      </text>
+                    )}
+                  </g>
+                )}
 
                 {/* 4. Remote Teammate Selection Tag */}
                 {remoteSelector && (

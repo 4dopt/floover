@@ -9,7 +9,8 @@ import { ExportModal } from './components/ExportModal';
 import { NewPlanModal } from './components/NewPlanModal';
 import { LandingPage } from './components/LandingPage';
 import { MarketingQuestionnaireModal } from './components/MarketingQuestionnaireModal';
-import { FloorPlan, FloorElement, FurniturePreset, RoomTemplate, ProjectSummary } from './types';
+import { PricingPage } from './components/PricingPage';
+import { FloorPlan, FloorElement, FurniturePreset, RoomTemplate, ProjectSummary, PricingPlanId } from './types';
 import { useRealtime } from './hooks/useRealtime';
 import { FURNITURE_PRESETS } from './data/furniturePresets';
 import { ROOM_TEMPLATES } from './data/roomTemplates';
@@ -196,7 +197,11 @@ const DEFAULT_FLOOR_PLAN: FloorPlan = {
 };
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates'>('landing');
+  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing'>('landing');
+  const [userPlan, setUserPlan] = useState<PricingPlanId>(() => {
+    const saved = (localStorage.getItem('floordone_user_plan') || localStorage.getItem('floover_user_plan')) as PricingPlanId;
+    return saved || 'free';
+  });
   const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
   const [floorPlan, setFloorPlan] = useState<FloorPlan>(DEFAULT_FLOOR_PLAN);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -227,7 +232,7 @@ export default function App() {
     if (projId && projId !== floorPlan.id) {
       loadProjectById(projId);
       setActiveView('editor');
-    } else if (viewParam === 'editor' || viewParam === 'dashboard' || viewParam === 'templates') {
+    } else if (viewParam === 'editor' || viewParam === 'dashboard' || viewParam === 'templates' || viewParam === 'pricing') {
       setActiveView(viewParam);
     }
   }, []);
@@ -414,7 +419,9 @@ export default function App() {
       rotation: 0,
       covers: preset.defaultCovers,
       status: 'available',
-      color: preset.defaultColor
+      color: preset.defaultColor,
+      subtype: preset.subtype,
+      category: preset.category
     };
 
     const updatedPlan = {
@@ -447,7 +454,9 @@ export default function App() {
       rotation: 0,
       covers: preset.defaultCovers,
       status: 'available',
-      color: preset.defaultColor
+      color: preset.defaultColor,
+      subtype: preset.subtype,
+      category: preset.category
     };
 
     const updatedPlan = {
@@ -681,7 +690,7 @@ export default function App() {
   // Landing Page View
   if (activeView === 'landing') {
     return (
-      <div id="floover-landing-container" className="min-h-screen bg-white text-slate-900 flex flex-col font-sans">
+      <div id="floordone-landing-container" className="min-h-screen bg-white text-slate-900 flex flex-col font-sans">
         <LandingPage
           onGetStarted={handleGetStartedFromLanding}
           onOpenEditor={(templateId) => {
@@ -696,6 +705,7 @@ export default function App() {
           }}
           onOpenDashboard={() => setActiveView('dashboard')}
           onOpenTemplates={() => setActiveView('templates')}
+          onOpenPricing={() => setActiveView('pricing')}
         />
 
         <MarketingQuestionnaireModal
@@ -728,6 +738,7 @@ export default function App() {
         setShowGrid={setShowGrid}
         collaborators={collaborators}
         currentUser={currentUser}
+        userPlan={userPlan}
         onOpenCollaboration={() => setIsCollaborationOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
       />
@@ -789,6 +800,19 @@ export default function App() {
             onStartBlank={(name, venueType, width, height, unit) => handleCreateProject(name, venueType, width, height, unit)}
             onBackToEditor={() => setActiveView('editor')}
           />
+        )}
+
+        {/* Pricing View */}
+        {activeView === 'pricing' && (
+          <div className="flex-1 overflow-y-auto w-full bg-slate-50">
+            <PricingPage
+              onBackToEditor={() => setActiveView('editor')}
+              onOpenTemplates={() => setActiveView('templates')}
+              onOpenDashboard={() => setActiveView('dashboard')}
+              currentPlan={userPlan}
+              onSelectPlan={(plan) => setUserPlan(plan)}
+            />
+          </div>
         )}
       </main>
 

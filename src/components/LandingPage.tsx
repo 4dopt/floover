@@ -19,9 +19,12 @@ import {
   Calendar,
   DollarSign,
   HelpCircle,
-  Utensils
+  Utensils,
+  Tag,
+  Crown,
+  Lock
 } from 'lucide-react';
-import { FlooverLogo } from './FlooverLogo';
+import { FloordoneLogo } from './FloordoneLogo';
 import { ROOM_TEMPLATES } from '../data/roomTemplates';
 
 interface LandingPageProps {
@@ -29,13 +32,15 @@ interface LandingPageProps {
   onOpenEditor: (templateId?: string) => void;
   onOpenDashboard: () => void;
   onOpenTemplates: () => void;
+  onOpenPricing?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onGetStarted,
   onOpenEditor,
   onOpenDashboard,
-  onOpenTemplates
+  onOpenTemplates,
+  onOpenPricing
 }) => {
   // Interactive Hero Preview state
   const [activeTableId, setActiveTableId] = useState<string>('t-01');
@@ -83,7 +88,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const heroTotalCovers = heroTables.reduce((acc, t) => acc + t.covers, 0);
 
   return (
-    <div id="floover-landing-page" className="min-h-screen bg-white text-slate-900 font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900">
+    <div id="floordone-landing-page" className="min-h-screen bg-white text-slate-900 font-sans antialiased selection:bg-indigo-100 selection:text-indigo-900">
       {/* 1. TOP ANNOUNCEMENT & BRAND HEADER */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
@@ -92,7 +97,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             className="cursor-pointer"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           >
-            <FlooverLogo size="md" showWordmark={true} showBadge={true} />
+            <FloordoneLogo size="md" showWordmark={true} />
           </div>
 
           {/* Nav Links */}
@@ -108,6 +113,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </a>
             <a href="#templates" className="hover:text-slate-900 transition">
               Templates
+            </a>
+            <a href="#pricing" className="hover:text-slate-900 transition flex items-center gap-1 text-emerald-600 font-bold">
+              Pricing
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
+                $1.19
+              </span>
             </a>
             <a href="#testimonials" className="hover:text-slate-900 transition">
               Reviews
@@ -145,7 +156,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Pill */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Floover 2.0 • Precision Hospitality Seating & Floor Studio</span>
+              <span>Floordone 2.0 • Precision Hospitality Seating & Floor Studio</span>
             </div>
 
             {/* Main Headline */}
@@ -223,7 +234,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <div className="w-3 h-3 rounded-full bg-emerald-500/80" />
                   </div>
                   <span className="text-slate-400 font-medium font-mono text-[11px] hidden sm:inline">
-                    floover://studio/le-bistro-main-dining
+                    floordone://studio/le-bistro-main-dining
                   </span>
                 </div>
 
@@ -430,7 +441,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Engineered specifically for hospitality & event workflows.
             </h2>
             <p className="text-slate-600 text-sm sm:text-base">
-              Say goodbye to clunky CAD tools, paper scratchpads, and static spreadsheets. Floover gives you precision layouts with zero learning curve.
+              Say goodbye to clunky CAD tools, paper scratchpads, and static spreadsheets. Floordone gives you precision layouts with zero learning curve.
             </p>
           </div>
 
@@ -559,7 +570,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/80 space-y-1.5">
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
                   <TrendingUp className="w-4 h-4 text-emerald-600" />
-                  The Floover Optimization Impact:
+                  The Floordone Optimization Impact:
                 </div>
                 <p className="text-xs text-emerald-900 font-medium">
                   Optimizing just 4 extra seats in your dining room generates an estimated{' '}
@@ -575,7 +586,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   onClick={onGetStarted}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-extrabold shadow-sm transition"
                 >
-                  Start Optimizing With Floover
+                  Start Optimizing With Floordone
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -795,7 +806,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 ))}
               </div>
               <p className="text-sm text-slate-700 italic leading-relaxed">
-                "Floover changed how we manage Friday night service. Being able to toggle corner seats and export crisp PDF manifests for the host stand takes minutes instead of hours on paper."
+                "Floordone changed how we manage Friday night service. Being able to toggle corner seats and export crisp PDF manifests for the host stand takes minutes instead of hours on paper."
               </p>
               <div>
                 <p className="font-bold text-sm text-slate-900">Marcus Sterling</p>
@@ -810,7 +821,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 ))}
               </div>
               <p className="text-sm text-slate-700 italic leading-relaxed">
-                "Wedding couples love seeing exact seating schematics with their bridal head tables and dance floors clearly mapped. Floover helps us close event contracts so much faster."
+                "Wedding couples love seeing exact seating schematics with their bridal head tables and dance floors clearly mapped. Floordone helps us close event contracts so much faster."
               </p>
               <div>
                 <p className="font-bold text-sm text-slate-900">Elena Rostova</p>
@@ -836,6 +847,182 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
+      {/* 8b. PRICING SECTION */}
+      <section id="pricing" className="py-20 bg-slate-50 border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-2xs">
+              <Tag className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Pocket-Friendly Micro Pricing</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+              Hospitality Grade Software at Everyday Prices
+            </h2>
+            <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
+              No contracts. No per-seat extortion. Plans start at less than a single morning coffee, or grab the one-time Lifetime deal and never pay a subscription again.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
+            {/* Free */}
+            <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-900 text-base">Starter Free</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Free</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-slate-900">$0</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ forever</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Best for quick table sketches and occasional dining arrangements.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                  <li className="flex items-center gap-2">✓ 1 Active floor plan</li>
+                  <li className="flex items-center gap-2">✓ Up to 30 tables & chairs</li>
+                  <li className="flex items-center gap-2">✓ Corner chair removal</li>
+                  <li className="flex items-center gap-2">✓ Standard SVG/PNG exports</li>
+                </ul>
+              </div>
+              <button
+                onClick={onGetStarted}
+                className="mt-6 w-full py-2.5 rounded-xl border border-slate-300 text-slate-800 text-xs font-bold hover:bg-slate-50 transition"
+              >
+                Start Free
+              </button>
+            </div>
+
+            {/* Solo Host */}
+            <div className="bg-white rounded-2xl p-6 border border-emerald-300 shadow-sm flex flex-col justify-between relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                  ⚡ CHEAPEST PRO
+                </span>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-900 text-base">Solo Host</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Recommended</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-emerald-700">$1.19</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ mo (billed yearly)</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Ideal for single restaurants, cafes, pop-ups, and private dining rooms.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                  <li className="flex items-center gap-2">✓ <strong>Unlimited</strong> floor plans</li>
+                  <li className="flex items-center gap-2">✓ All walls, doors & decks</li>
+                  <li className="flex items-center gap-2">✓ Botanical plants & decor</li>
+                  <li className="flex items-center gap-2">✓ High-res vector PDF export</li>
+                  <li className="flex items-center gap-2">✓ Guest seating manifest</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  if (onOpenPricing) onOpenPricing();
+                  else onGetStarted();
+                }}
+                className="mt-6 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
+              >
+                Upgrade to Solo ($1.19)
+              </button>
+            </div>
+
+            {/* Pro Studio */}
+            <div className="bg-white rounded-2xl p-6 border-2 border-indigo-600 shadow-lg flex flex-col justify-between relative md:-translate-y-1">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-600 text-white shadow-xs">
+                  🔥 MOST POPULAR
+                </span>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-900 text-base">Pro Studio</h3>
+                  <Crown className="w-4 h-4 text-indigo-600" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-indigo-600">$2.49</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ mo (billed yearly)</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  For thriving venues, wedding coordinators, and hospitality teams.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                  <li className="flex items-center gap-2">✓ <strong>Everything in Solo</strong></li>
+                  <li className="flex items-center gap-2">✓ Live team multiplayer cursors</li>
+                  <li className="flex items-center gap-2">✓ Custom venue logo on PDFs</li>
+                  <li className="flex items-center gap-2">✓ Table status reservations sync</li>
+                  <li className="flex items-center gap-2">✓ Unlimited revisions & history</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  if (onOpenPricing) onOpenPricing();
+                  else onGetStarted();
+                }}
+                className="mt-6 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition shadow-md"
+              >
+                Upgrade to Pro ($2.49)
+              </button>
+            </div>
+
+            {/* Lifetime */}
+            <div className="bg-gradient-to-b from-amber-50/60 to-white rounded-2xl p-6 border border-amber-300 shadow-md flex flex-col justify-between relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 border border-amber-300 shadow-2xs">
+                  ⭐ LIFETIME DEAL
+                </span>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-900 text-base">Lifetime Pass</h3>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">One-Time</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-slate-900">$9.99</span>
+                  <span className="text-xs text-slate-500 font-semibold">one-time payment</span>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Pay once, use forever. No recurring monthly or annual billing.
+                </p>
+                <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                  <li className="flex items-center gap-2">✓ All Pro features unlocked</li>
+                  <li className="flex items-center gap-2">✓ Lifetime free updates</li>
+                  <li className="flex items-center gap-2">✓ No recurring charges ever</li>
+                  <li className="flex items-center gap-2">✓ VIP Founder badge</li>
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  if (onOpenPricing) onOpenPricing();
+                  else onGetStarted();
+                }}
+                className="mt-6 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition shadow-md"
+              >
+                Get Lifetime Pass ($9.99)
+              </button>
+            </div>
+          </div>
+
+          {/* Dedicated full page link */}
+          <div className="text-center pt-2">
+            <button
+              onClick={() => {
+                if (onOpenPricing) onOpenPricing();
+                else onGetStarted();
+              }}
+              className="inline-flex items-center gap-2 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-2xs hover:shadow-xs transition"
+            >
+              <span>See Full Plan Comparison & FAQ</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </section>
+
       {/* 9. FAQ SECTION */}
       <section className="py-16 bg-slate-50/50 border-b border-slate-100">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
@@ -844,7 +1031,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Frequently Asked Questions
             </span>
             <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-              Everything you need to know about Floover
+              Everything you need to know about Floordone
             </h2>
           </div>
 
@@ -852,7 +1039,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {[
               {
                 q: 'Can I remove chairs on corners or short ends of tables?',
-                a: 'Yes! Floover includes a custom seating engine. You can click directly on any chair around a selected table to remove it, or use the one-click Corners and Ends toggles in the table toolbar.'
+                a: 'Yes! Floordone includes a custom seating engine. You can click directly on any chair around a selected table to remove it, or use the one-click Corners and Ends toggles in the table toolbar.'
               },
               {
                 q: 'Can I export clean PDFs for my floor staff and kitchen?',
@@ -860,11 +1047,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               },
               {
                 q: 'Does it support real-time team collaboration?',
-                a: 'Floover features full live multiplayer sync. When your colleagues or event planners open the same floor plan, you see their live cursor presence and real-time element movements.'
+                a: 'Floordone features full live multiplayer sync. When your colleagues or event planners open the same floor plan, you see their live cursor presence and real-time element movements.'
               },
               {
                 q: 'Is there any software installation needed?',
-                a: 'None! Floover runs entirely in modern web browsers on desktop, laptop, and iPad touch screens with full offline capability and local persistence.'
+                a: 'None! Floordone runs entirely in modern web browsers on desktop, laptop, and iPad touch screens with full offline capability and local persistence.'
               }
             ].map((faq, idx) => (
               <div key={idx} className="p-5 rounded-xl bg-white border border-slate-200 space-y-1.5">
@@ -922,8 +1109,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <footer className="py-8 bg-slate-950 text-slate-500 text-xs border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <FlooverLogo size="sm" showBadge={false} />
-            <span>© {new Date().getFullYear()} Floover Inc. All rights reserved.</span>
+            <FloordoneLogo size="sm" showBadge={false} />
+            <span>© {new Date().getFullYear()} Floordone Inc. All rights reserved.</span>
           </div>
 
           <div className="flex items-center gap-6">
@@ -932,6 +1119,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="hover:text-slate-300 transition"
             >
               Features
+            </a>
+            <a
+              href="#pricing"
+              onClick={(e) => {
+                if (onOpenPricing) {
+                  e.preventDefault();
+                  onOpenPricing();
+                }
+              }}
+              className="hover:text-emerald-400 text-emerald-500 font-bold transition flex items-center gap-1"
+            >
+              Pricing ($1.19/mo)
             </a>
             <a
               href="#roi-calculator"

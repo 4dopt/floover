@@ -15,6 +15,7 @@ app.use(express.json({ limit: '10mb' }));
 const DATA_DIR = path.join(process.cwd(), 'data');
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
 const LEADS_FILE = path.join(DATA_DIR, 'marketing_leads.json');
+const PAID_ORDERS_FILE = path.join(DATA_DIR, 'paid_orders.json');
 
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -499,6 +500,105 @@ app.post('/api/marketing/leads', (req, res) => {
 
 app.get('/api/marketing/leads', (req, res) => {
   res.json({ leads: marketingLeadsCache });
+});
+
+// ==================== LEMON SQUEEZY BILLING & ACTIVATION ====================
+
+function getPaidOrders(): any[] {
+  try {
+    if (fs.existsSync(PAID_ORDERS_FILE)) {
+      const content = fs.readFileSync(PAID_ORDERS_FILE, 'utf-8');
+      return JSON.parse(content);
+    }
+  } catch (e) {
+    console.error('Failed to read paid orders', e);
+  }
+  return [];
+}
+
+function savePaidOrders(orders: any[]) {
+  try {
+    fs.writeFileSync(PAID_ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Failed to save paid orders', err);
+  }
+}
+
+let paidOrdersCache = getPaidOrders();
+
+// 1. Verify and activate order (called by client when user enters order/key or completes checkout)
+app.post('/api/billing/activate', (req, res) => {
+  const { orderId, email, plan = 'pro' } = req.body;
+  if (!orderId) {
+    return res.status(400).json({ success: false, message: 'Order ID is required' });
+  }
+
+  const activationRecord = {
+    id: `act-${Date.now()}`,
+    orderId: String(orderId).trim(),
+    email: email ? String(email).trim() : undefined,
+    plan: plan || 'pro',
+    activatedAt: new Date().toISOString(),
+    status: 'active'
+  };
+
+  // Upsert into cache
+  const existingIdx = paidOrdersCache.findIndex(
+    (o) => o.orderId.toLowerCase() === String(orderId).trim().toLowerCase()
+  );
+  if (existingIdx >= 0) {
+    paidOrdersCache[existingIdx] = { ...paidOrdersCache[existingIdx], ...activationRecord };
+  } else {
+    paidOrdersCache.unshift(activationRecord);
+  }
+  savePaidOrders(paidOrdersCache);
+
+  res.json({
+    success: true,
+    plan: activationRecord.plan,
+    message: `🎉 Order ${orderId} verified! Your account has been upgraded to ${activationRecord.plan.toUpperCase()}.`
+  });
+});
+
+// 2. Lemon Squeezy Webhook endpoint (receives order_created, subscription_created events)
+app.post('/api/webhook/lemonsqueezy', (req, res) => {
+  try {
+    const payload = req.body;
+    const eventName = payload?.meta?.event_name || payload?.event_name || 'order_created';
+    const customData = payload?.meta?.custom_data || {};
+    const orderData = payload?.data?.attributes || payload;
+    const orderId = payload?.data?.id || orderData?.order_id || `ls-${Date.now()}`;
+    const userEmail = orderData?.user_email || orderData?.customer_email || customData?.email;
+    const plan = customData?.plan || 'pro';
+
+    console.log(`[LemonSqueezy Webhook] Received ${eventName} for order ${orderId}`);
+
+    const webhookOrder = {
+      id: `webhook-${Date.now()}`,
+      orderId: String(orderId),
+      email: userEmail,
+      plan,
+      eventName,
+      receivedAt: new Date().toISOString(),
+      raw: payload
+    };
+
+    paidOrdersCache.unshift(webhookOrder);
+    savePaidOrders(paidOrdersCache);
+
+    res.status(200).json({ received: true });
+  } catch (err) {
+    console.error('Error handling Lemon Squeezy webhook:', err);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+// 3. Billing status check
+app.get('/api/billing/status', (req, res) => {
+  res.json({
+    checkoutUrl: 'https://floover.lemonsqueezy.com/checkout/buy/e505c90b-80d6-4140-adb5-0da40dca123c?embed=1',
+    activePaidCount: paidOrdersCache.length
+  });
 });
 
 // ==================== REAL-TIME WEBSOCKETS ====================

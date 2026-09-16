@@ -19,7 +19,25 @@ import {
   AlertCircle,
   Filter,
   Layers,
-  ChevronRight
+  ChevronRight,
+  DoorOpen,
+  DoorClosed,
+  Columns3,
+  Trees,
+  Sprout,
+  Sun,
+  LayoutGrid,
+  Wine,
+  ChefHat,
+  UserCheck,
+  Laptop,
+  Mic,
+  Disc,
+  Camera,
+  ChevronsLeftRight,
+  Split,
+  Box,
+  AlertTriangle
 } from 'lucide-react';
 import { FurniturePreset, FloorElement, FloorPlan, TableShape, TableStatus, RoomTemplate } from '../types';
 import { FURNITURE_PRESETS } from '../data/furniturePresets';
@@ -42,6 +60,44 @@ interface SidebarProps {
   onAddPresetElement: (preset: FurniturePreset) => void;
   onApplyTemplate: (template: RoomTemplate) => void;
   onStartBlank?: () => void;
+}
+
+function getPresetIcon(preset: FurniturePreset) {
+  switch (preset.icon) {
+    case 'DoorOpen': return <DoorOpen className="w-5 h-5 text-amber-700" />;
+    case 'DoorClosed': return <DoorClosed className="w-5 h-5 text-slate-700" />;
+    case 'Columns3': return <Columns3 className="w-5 h-5 text-slate-700" />;
+    case 'Trees': return <Trees className="w-5 h-5 text-emerald-600" />;
+    case 'Sprout': return <Sprout className="w-5 h-5 text-emerald-500" />;
+    case 'Sun': return <Sun className="w-5 h-5 text-amber-500" />;
+    case 'LayoutGrid': return <LayoutGrid className="w-5 h-5 text-amber-700" />;
+    case 'Layers': return <Layers className="w-5 h-5 text-slate-700" />;
+    case 'Wine': return <Wine className="w-5 h-5 text-indigo-600" />;
+    case 'ChefHat': return <ChefHat className="w-5 h-5 text-orange-600" />;
+    case 'UserCheck': return <UserCheck className="w-5 h-5 text-blue-600" />;
+    case 'Laptop': return <Laptop className="w-5 h-5 text-blue-600" />;
+    case 'Mic': return <Mic className="w-5 h-5 text-purple-600" />;
+    case 'Sparkles': return <Sparkles className="w-5 h-5 text-amber-500" />;
+    case 'Disc': return <Disc className="w-5 h-5 text-violet-600" />;
+    case 'Camera': return <Camera className="w-5 h-5 text-pink-500" />;
+    case 'ChevronsLeftRight': return <ChevronsLeftRight className="w-5 h-5 text-cyan-600" />;
+    case 'Split': return <Split className="w-5 h-5 text-blue-600" />;
+    case 'Box': return <Box className="w-5 h-5 text-emerald-700" />;
+    case 'AlertTriangle': return <AlertTriangle className="w-5 h-5 text-emerald-600" />;
+    case 'Armchair': return <Armchair className="w-5 h-5 text-indigo-600" />;
+    case 'Square': return <Square className="w-5 h-5 text-slate-700" />;
+    case 'Circle': return <Circle className="w-5 h-5 text-slate-700" />;
+    case 'Egg': return <Egg className="w-5 h-5 text-slate-700" />;
+    case 'RectangleHorizontal': return <RectangleHorizontal className="w-5 h-5 text-slate-700" />;
+    default:
+      if (preset.category === 'decor') return <Sprout className="w-5 h-5 text-emerald-600" />;
+      if (preset.category === 'outdoor') return <Sun className="w-5 h-5 text-amber-600" />;
+      if (preset.category === 'architectural') return <Columns3 className="w-5 h-5 text-slate-700" />;
+      if (preset.shape === 'round') return <Circle className="w-5 h-5 text-slate-700" />;
+      if (preset.shape === 'square') return <Square className="w-5 h-5 text-slate-700" />;
+      if (preset.shape === 'oval') return <Egg className="w-5 h-5 text-slate-700" />;
+      return <RectangleHorizontal className="w-5 h-5 text-slate-700" />;
+  }
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -187,9 +243,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {[
                 { id: 'all', label: 'All Items' },
                 { id: 'tables', label: 'Tables' },
-                { id: 'fixtures', label: 'Fixtures & Bar' },
-                { id: 'architectural', label: 'Structure' },
-                { id: 'decor', label: 'Decor' }
+                { id: 'architectural', label: 'Walls & Doors' },
+                { id: 'outdoor', label: 'Decks & Patio' },
+                { id: 'decor', label: 'Plants & Decor' },
+                { id: 'fixtures', label: 'Fixtures & Bar' }
               ].map((cat) => (
                 <button
                   key={cat.id}
@@ -223,12 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="flex items-center gap-3">
                   {/* Shape Icon Preview */}
                   <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
-                    {preset.shape === 'round' && <Circle className="w-5 h-5" />}
-                    {preset.shape === 'square' && <Square className="w-5 h-5" />}
-                    {preset.shape === 'rectangle' && <RectangleHorizontal className="w-5 h-5" />}
-                    {preset.shape === 'oval' && <Egg className="w-5 h-5" />}
-                    {preset.shape === 'booth' && <Armchair className="w-5 h-5" />}
-                    {preset.shape === 'bar' && <Layers className="w-5 h-5" />}
+                    {getPresetIcon(preset)}
                   </div>
 
                   <div>

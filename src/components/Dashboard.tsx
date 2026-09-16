@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { ProjectSummary } from '../types';
 import { NewPlanModal } from './NewPlanModal';
-import { FlooverLogo } from './FlooverLogo';
+import { FloordoneLogo } from './FloordoneLogo';
 
 interface DashboardProps {
   projects: ProjectSummary[];
@@ -61,7 +61,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Header & Stats Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <FlooverLogo size="lg" showWordmark={false} showBadge={false} className="mt-1" />
+            <FloordoneLogo size="lg" showWordmark={false} showBadge={false} className="mt-1" />
             <div>
               <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
                 <CloudCheck className="w-4 h-4 text-emerald-600" />
@@ -71,7 +71,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 Floor Plan Projects
               </h1>
               <p className="text-slate-500 text-sm mt-0.5">
-                Manage multi-room layouts, seating arrangements, and live team plans with Floover.
+                Manage multi-room layouts, seating arrangements, and live team plans with Floordone.
               </p>
             </div>
           </div>
