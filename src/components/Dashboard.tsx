@@ -13,7 +13,9 @@ import {
   Trash2,
   ExternalLink,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  ArrowRight,
+  Tag
 } from 'lucide-react';
 import { ProjectSummary } from '../types';
 import { NewPlanModal } from './NewPlanModal';
@@ -28,6 +30,8 @@ interface DashboardProps {
   onRefreshProjects: () => void;
   isSyncing: boolean;
   onOpenTemplates: () => void;
+  onBackToEditor?: () => void;
+  onOpenPricing?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -38,7 +42,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDeleteProject,
   onRefreshProjects,
   isSyncing,
-  onOpenTemplates
+  onOpenTemplates,
+  onBackToEditor,
+  onOpenPricing
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [venueFilter, setVenueFilter] = useState('all');
@@ -77,6 +83,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            {onOpenPricing && (
+              <button
+                onClick={onOpenPricing}
+                className="px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Tag className="w-4 h-4 text-emerald-600" />
+                <span>Pricing</span>
+              </button>
+            )}
+
             <button
               id="btn-dashboard-refresh"
               onClick={onRefreshProjects}
@@ -104,6 +120,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Plus className="w-4 h-4" />
               New Floor Plan
             </button>
+
+            {onBackToEditor && (
+              <button
+                onClick={onBackToEditor}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
+              >
+                <span>Designer</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 

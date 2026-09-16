@@ -719,29 +719,31 @@ export default function App() {
 
   return (
     <div id="app-root-container" className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans">
-      {/* 1. Global Navigation Bar */}
-      <Navbar
-        activeView={activeView}
-        setActiveView={setActiveView}
-        floorPlan={floorPlan}
-        onNewProject={() => setIsNewPlanModalOpen(true)}
-        onSaveProject={() => saveProjectToCloud(floorPlan)}
-        isSaving={isSaving}
-        syncStatus={syncStatus}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        snapToGrid={snapToGrid}
-        setSnapToGrid={setSnapToGrid}
-        showGrid={showGrid}
-        setShowGrid={setShowGrid}
-        collaborators={collaborators}
-        currentUser={currentUser}
-        userPlan={userPlan}
-        onOpenCollaboration={() => setIsCollaborationOpen(true)}
-        onOpenExport={() => setIsExportOpen(true)}
-      />
+      {/* 1. Designer Header Bar (ONLY displayed inside the actual floor designer) */}
+      {activeView === 'editor' && (
+        <Navbar
+          activeView={activeView}
+          setActiveView={setActiveView}
+          floorPlan={floorPlan}
+          onNewProject={() => setIsNewPlanModalOpen(true)}
+          onSaveProject={() => saveProjectToCloud(floorPlan)}
+          isSaving={isSaving}
+          syncStatus={syncStatus}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          snapToGrid={snapToGrid}
+          setSnapToGrid={setSnapToGrid}
+          showGrid={showGrid}
+          setShowGrid={setShowGrid}
+          collaborators={collaborators}
+          currentUser={currentUser}
+          userPlan={userPlan}
+          onOpenCollaboration={() => setIsCollaborationOpen(true)}
+          onOpenExport={() => setIsExportOpen(true)}
+        />
+      )}
 
       {/* 2. Main Content Body */}
       <main className="flex-1 flex overflow-hidden relative">
@@ -790,6 +792,8 @@ export default function App() {
             onRefreshProjects={fetchProjects}
             isSyncing={isSaving}
             onOpenTemplates={() => setActiveView('templates')}
+            onBackToEditor={() => setActiveView('editor')}
+            onOpenPricing={() => setActiveView('pricing')}
           />
         )}
 
