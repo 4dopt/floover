@@ -4,6 +4,20 @@ export type ElementType = 'table' | 'chair' | 'fixture' | 'architectural' | 'dec
 
 export type TableStatus = 'available' | 'reserved' | 'occupied' | 'vip' | 'blocked';
 
+export interface Point2D {
+  x: number; // in room coordinates (ft or m)
+  y: number; // in room coordinates (ft or m)
+}
+
+export type RoomShapePreset =
+  | 'rectangle'
+  | 'l-shape'
+  | 't-shape'
+  | 'u-shape'
+  | 'angled'
+  | 'hexagon'
+  | 'custom';
+
 export interface FloorElement {
   id: string;
   type: ElementType;
@@ -36,6 +50,10 @@ export interface FloorPlan {
   roomHeight: number; // e.g. 35 (in unit)
   unit: 'ft' | 'm';
   gridSize: number; // pixels per foot/meter (default 16 or 20)
+  roomShape?: RoomShapePreset;
+  boundaryPoints?: Point2D[]; // Polygon vertices in room coordinates (e.g. [{x:0, y:0}, ...])
+  wallHeight?: number; // Wall height in room unit (default 10 ft / 3 m)
+  wallThickness?: number; // Wall thickness (default 0.75 ft / 0.25 m)
   elements: FloorElement[];
   createdAt: string;
   updatedAt: string;

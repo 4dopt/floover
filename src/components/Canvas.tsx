@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   ZoomIn,
   ZoomOut,
@@ -23,9 +23,13 @@ import {
   ArrowUpDown,
   Scaling,
   X,
-  Sliders
+  Sliders,
+  Box,
+  Shapes,
+  Eye,
+  Layers
 } from 'lucide-react';
-import { FloorElement, FloorPlan, Collaborator, TableStatus } from '../types';
+import { FloorElement, FloorPlan, Collaborator, TableStatus, Point2D, RoomShapePreset } from '../types';
 import {
   getChairPositions,
   getEffectiveCovers,
@@ -37,7 +41,18 @@ import {
   clampElementPosition,
   dragClampElementPosition
 } from '../utils/geometry';
+import {
+  getEffectiveBoundaryPoints,
+  calculatePolygonArea,
+  calculateBoundingBox,
+  getWallSegments,
+  insertVertexOnEdge,
+  removeVertexAtIndex,
+  pointsToSvgPointsString
+} from '../utils/roomGeometry';
 import { ArchitecturalElementRenderer, getElementSubtype } from './ArchitecturalElementRenderer';
+import { Canvas3D } from './Canvas3D';
+import { RoomShapeModal } from './RoomShapeModal';
 
 interface CanvasProps {
   floorPlan: FloorPlan;
@@ -91,6 +106,36 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Floor dimensions quick modal popover
   const [isFloorDimensionModalOpen, setIsFloorDimensionModalOpen] = useState(false);
+
+  // 3D Visualizer Mode toggle
+  const [is3DMode, setIs3DMode] = useState(false);
+
+  // Room Architecture / Hall Shape Modal
+  const [isRoomShapeModalOpen, setIsRoomShapeModalOpen] = useState(false);
+
+  // Direct canvas wall corner editing
+  const [isEditingWalls, setIsEditingWalls] = useState(false);
+  const [draggedVertexIdx, setDraggedVertexIdx] = useState<number | null>(null);
+  const draggedVertexIdxRef = useRef<number | null>(null);
+
+  // Boundary points of the room
+  const effectiveBoundaryPoints = useMemo(
+    () => getEffectiveBoundaryPoints(floorPlan),
+    [floorPlan.boundaryPoints, floorPlan.roomWidth, floorPlan.roomHeight]
+  );
+  const [liveBoundaryPoints, setLiveBoundaryPoints] = useState<Point2D[]>(effectiveBoundaryPoints);
+  const liveBoundaryPointsRef = useRef<Point2D[]>(effectiveBoundaryPoints);
+
+  useEffect(() => {
+    setLiveBoundaryPoints(effectiveBoundaryPoints);
+    liveBoundaryPointsRef.current = effectiveBoundaryPoints;
+  }, [effectiveBoundaryPoints]);
+
+  // Dynamic calculated floor area using polygon shoelace formula
+  const floorArea = useMemo(
+    () => calculatePolygonArea(liveBoundaryPoints),
+    [liveBoundaryPoints]
+  );
 
   // Pan & Zoom state
   const [zoom, setZoom] = useState(1);
@@ -163,7 +208,7 @@ export const Canvas: React.FC<CanvasProps> = ({
     };
   }, []);
 
-  // Global pointerup to ensure pan and resize cleanly complete anywhere on screen
+  // Global pointerup to ensure pan, resize, and wall vertex drag cleanly complete anywhere on screen
   useEffect(() => {
     const handleGlobalPointerUp = () => {
       if (floorResize) {
@@ -179,6 +224,22 @@ export const Canvas: React.FC<CanvasProps> = ({
         }
         setFloorResize(null);
       }
+
+      if (draggedVertexIdxRef.current !== null) {
+        const finalPoints = liveBoundaryPointsRef.current;
+        const bbox = calculateBoundingBox(finalPoints);
+        if (onUpdateFloorPlan) {
+          onUpdateFloorPlan({
+            roomShape: 'custom',
+            boundaryPoints: finalPoints,
+            roomWidth: Math.max(minAllowedWidth, bbox.width),
+            roomHeight: Math.max(minAllowedHeight, bbox.height)
+          });
+        }
+        draggedVertexIdxRef.current = null;
+        setDraggedVertexIdx(null);
+      }
+
       setIsPanning(false);
       setDraggedElementId(null);
       setIsRotating(false);
@@ -188,7 +249,66 @@ export const Canvas: React.FC<CanvasProps> = ({
     return () => {
       window.removeEventListener('pointerup', handleGlobalPointerUp);
     };
-  }, [floorResize, onUpdateFloorPlan, floorPlan.roomWidth, floorPlan.roomHeight]);
+  }, [floorResize, onUpdateFloorPlan, floorPlan.roomWidth, floorPlan.roomHeight, minAllowedWidth]);
+
+  // Pointer down on a boundary vertex
+  const handleVertexPointerDown = (e: React.PointerEvent, idx: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    draggedVertexIdxRef.current = idx;
+    setDraggedVertexIdx(idx);
+    try {
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Split a wall edge and add a corner vertex
+  const handleSplitWallEdge = (edgeIdx: number) => {
+    const nextPoints = insertVertexOnEdge(liveBoundaryPoints, edgeIdx);
+    setLiveBoundaryPoints(nextPoints);
+    liveBoundaryPointsRef.current = nextPoints;
+    const bbox = calculateBoundingBox(nextPoints);
+    onUpdateFloorPlan?.({
+      roomShape: 'custom',
+      boundaryPoints: nextPoints,
+      roomWidth: Math.max(minAllowedWidth, bbox.width),
+      roomHeight: Math.max(minAllowedHeight, bbox.height)
+    });
+  };
+
+  // Delete corner vertex
+  const handleDeleteVertex = (vertexIdx: number) => {
+    if (liveBoundaryPoints.length <= 3) return;
+    const nextPoints = removeVertexAtIndex(liveBoundaryPoints, vertexIdx);
+    setLiveBoundaryPoints(nextPoints);
+    liveBoundaryPointsRef.current = nextPoints;
+    const bbox = calculateBoundingBox(nextPoints);
+    onUpdateFloorPlan?.({
+      roomShape: 'custom',
+      boundaryPoints: nextPoints,
+      roomWidth: Math.max(minAllowedWidth, bbox.width),
+      roomHeight: Math.max(minAllowedHeight, bbox.height)
+    });
+  };
+
+  // Apply custom room shape from modal
+  const handleApplyShapeFromModal = (
+    shape: RoomShapePreset,
+    points: Point2D[],
+    newWidth: number,
+    newHeight: number
+  ) => {
+    setLiveBoundaryPoints(points);
+    liveBoundaryPointsRef.current = points;
+    onUpdateFloorPlan?.({
+      roomShape: shape,
+      boundaryPoints: points,
+      roomWidth: Math.max(minAllowedWidth, newWidth),
+      roomHeight: Math.max(minAllowedHeight, newHeight)
+    });
+  };
 
   // Grid snap helper
   const snap = (val: number, step = 10) => {
@@ -267,6 +387,30 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handlePointerMove = (e: React.PointerEvent) => {
     const coords = clientToCanvasCoords(e.clientX, e.clientY);
     onCursorMove(coords.x, coords.y);
+
+    // 0. Dragging room boundary vertex
+    if (draggedVertexIdxRef.current !== null) {
+      const idx = draggedVertexIdxRef.current;
+      let unitX = coords.x / scaleRatio;
+      let unitY = coords.y / scaleRatio;
+      if (snapToGrid) {
+        unitX = Math.round(unitX);
+        unitY = Math.round(unitY);
+      } else {
+        unitX = Math.round(unitX * 2) / 2;
+        unitY = Math.round(unitY * 2) / 2;
+      }
+      unitX = Math.max(0, unitX);
+      unitY = Math.max(0, unitY);
+
+      setLiveBoundaryPoints((prev) => {
+        const next = [...prev];
+        next[idx] = { x: unitX, y: unitY };
+        liveBoundaryPointsRef.current = next;
+        return next;
+      });
+      return;
+    }
 
     // 1. Resizing floor canvas takes highest precedence
     if (floorResize) {
@@ -556,6 +700,23 @@ export const Canvas: React.FC<CanvasProps> = ({
     onUpdateElement({ ...selectedElement, status });
   };
 
+  // If in 3D Mode, render the Three.js Interactive 3D Visualizer
+  if (is3DMode) {
+    return (
+      <div className="relative flex-1 h-full w-full bg-slate-900 overflow-hidden">
+        <Canvas3D
+          floorPlan={floorPlan}
+          onClose3D={() => setIs3DMode(false)}
+          onSelectElement={onSelectElement}
+          selectedElementId={selectedElementId}
+        />
+      </div>
+    );
+  }
+
+  const svgPointsStr = pointsToSvgPointsString(liveBoundaryPoints, scaleRatio);
+  const wallSegments = getWallSegments(liveBoundaryPoints);
+
   return (
     <div
       ref={containerRef}
@@ -608,6 +769,19 @@ export const Canvas: React.FC<CanvasProps> = ({
 
         <div className="h-4 w-px bg-slate-200 mx-0.5" />
 
+        {/* 3D Mode Toggle Button */}
+        <button
+          id="btn-toggle-3d-mode"
+          onClick={() => setIs3DMode(true)}
+          className="px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-xs hover:from-indigo-700 hover:to-indigo-800 active:scale-95"
+          title="Switch to 3D Venue Mode (Interactive 3D Walkthrough & Render)"
+        >
+          <Box className="w-3.5 h-3.5 text-indigo-200" />
+          <span>3D View</span>
+        </button>
+
+        <div className="h-4 w-px bg-slate-200 mx-0.5" />
+
         <button
           id="btn-zoom-in"
           onClick={handleZoomIn}
@@ -639,11 +813,12 @@ export const Canvas: React.FC<CanvasProps> = ({
       </div>
 
       {/* Floating Quick Stats Pill & Floor Resize Popover Trigger */}
-      <div className="absolute top-4 left-4 z-20 hidden sm:flex items-center gap-2.5 bg-white/95 backdrop-blur-xs px-3.5 py-1.5 rounded-xl shadow-md border border-slate-200 text-xs text-slate-600">
+      <div className="absolute top-4 left-4 z-20 hidden sm:flex items-center gap-2 bg-white/95 backdrop-blur-xs px-3.5 py-1.5 rounded-xl shadow-md border border-slate-200 text-xs text-slate-600">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-indigo-600" />
           <span>
             Room: <strong className="text-slate-900">{floorPlan.roomWidth} × {floorPlan.roomHeight} {floorPlan.unit}</strong>
+            <span className="text-slate-400 font-normal ml-1">({Math.round(floorArea).toLocaleString()} sq {floorPlan.unit})</span>
           </span>
         </div>
         <div className="h-3 w-px bg-slate-200" />
@@ -658,12 +833,30 @@ export const Canvas: React.FC<CanvasProps> = ({
           title="Adjust room dimensions or pick venue presets"
         >
           <Scaling className="w-3.5 h-3.5" />
-          <span>Resize Floor</span>
+          <span>Resize</span>
         </button>
-        <div className="h-3 w-px bg-slate-200" />
-        <div>
-          <span>Scale: <strong className="text-slate-900">1 {floorPlan.unit} = 20px</strong></span>
-        </div>
+        <button
+          id="btn-open-room-shape-modal"
+          onClick={() => setIsRoomShapeModalOpen(true)}
+          className="flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+          title="Alter Room Shape: L-Shape, T-Shape, U-Shape, Angled, Octagonal, or Custom Walls"
+        >
+          <Shapes className="w-3.5 h-3.5" />
+          <span>Alter Shape</span>
+        </button>
+        <button
+          id="btn-toggle-wall-editing"
+          onClick={() => setIsEditingWalls((prev) => !prev)}
+          className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+            isEditingWalls
+              ? 'bg-amber-500 text-white shadow-xs'
+              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+          }`}
+          title="Toggle interactive wall corner handles and edge splitting on the canvas"
+        >
+          <Move className="w-3 h-3" />
+          <span>{isEditingWalls ? 'Done Editing' : 'Edit Corners'}</span>
+        </button>
       </div>
 
       {/* Quick Floor Dimensions Popover Modal */}
@@ -871,11 +1064,32 @@ export const Canvas: React.FC<CanvasProps> = ({
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="italic">💡 Drag bottom-right corner anytime to resize directly</span>
+          <div className="pt-2.5 border-t border-slate-100 space-y-2">
+            <button
+              id="btn-modal-alter-room-shape"
+              onClick={() => {
+                setIsFloorDimensionModalOpen(false);
+                setIsRoomShapeModalOpen(true);
+              }}
+              className="w-full py-2 px-3 rounded-xl border border-indigo-200 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-2xs"
+            >
+              <Shapes className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Alter Hall Shape (L-Shape, T-Shape, Angled...)</span>
+            </button>
+            <div className="flex items-center justify-between text-[11px] text-slate-500">
+              <span className="italic">💡 Drag bottom-right corner anytime to resize directly</span>
+            </div>
           </div>
         </div>
       )}
+
+      {/* Room Shape Architecture Modal */}
+      <RoomShapeModal
+        floorPlan={floorPlan}
+        isOpen={isRoomShapeModalOpen}
+        onClose={() => setIsRoomShapeModalOpen(false)}
+        onApplyShape={handleApplyShapeFromModal}
+      />
 
       {/* Main SVG Floor Plan Canvas */}
       <div
@@ -977,14 +1191,11 @@ export const Canvas: React.FC<CanvasProps> = ({
             </pattern>
           </defs>
 
-          {/* Room Base Floor Surface (Click & Drag to Pan Canvas) */}
-          <rect
+          {/* Room Base Polygonal Floor Surface (Click & Drag to Pan Canvas) */}
+          <polygon
             id="room-floor-surface"
             data-floor-surface="true"
-            x="0"
-            y="0"
-            width={roomWidthPx}
-            height={roomHeightPx}
+            points={svgPointsStr}
             fill={showGrid ? "url(#grid-pattern-large)" : "#ffffff"}
             onPointerDown={handleCanvasBackgroundPointerDown}
             className={
@@ -994,8 +1205,26 @@ export const Canvas: React.FC<CanvasProps> = ({
             }
           />
 
-          {/* Perimeter measurement guides */}
-          <g className="measurement-guides select-none opacity-40">
+          {/* Architectural Perimeter Outer Wall Contour */}
+          <polygon
+            points={svgPointsStr}
+            fill="none"
+            stroke="#1e293b"
+            strokeWidth="7"
+            strokeLinejoin="round"
+            className="pointer-events-none"
+          />
+          <polygon
+            points={svgPointsStr}
+            fill="none"
+            stroke="#475569"
+            strokeWidth="2.5"
+            strokeLinejoin="round"
+            className="pointer-events-none"
+          />
+
+          {/* Perimeter measurement guides along the bounding grid */}
+          <g className="measurement-guides select-none opacity-40 pointer-events-none">
             {Array.from({ length: Math.floor(effectiveRoomWidth / 5) + 1 }).map((_, i) => (
               <g key={`x-${i}`} transform={`translate(${i * 5 * scaleRatio}, 0)`}>
                 <line x1="0" y1="0" x2="0" y2="10" stroke="#94a3b8" strokeWidth="1.5" />
@@ -1404,170 +1633,294 @@ export const Canvas: React.FC<CanvasProps> = ({
             );
           })}
 
-          {/* Interactive Floor Canvas Resizing Handles & Guides */}
-          <g id="floor-canvas-resize-controls" className="select-none">
-            {/* Live resize dashed guide perimeter if actively dragging */}
-            {floorResize && (
-              <rect
-                x={0}
-                y={0}
-                width={roomWidthPx}
-                height={roomHeightPx}
-                fill="none"
-                stroke="#6366f1"
-                strokeWidth="3"
-                strokeDasharray="6 4"
-                className="pointer-events-none"
-              />
-            )}
+          {/* Wall Segments & Interactive Dimension Badges */}
+          <g id="wall-segments-group" className="select-none">
+            {wallSegments.map((seg) => {
+              const midPxX = seg.mid.x * scaleRatio;
+              const midPxY = seg.mid.y * scaleRatio;
 
-            {/* EAST HANDLE (Right border resize) */}
-            <g
-              id="handle-resize-east"
-              className="cursor-ew-resize group"
-              onPointerDown={(e) => handleFloorResizeStart(e, 'e')}
-            >
-              {/* Generous invisible hit test zone */}
-              <rect
-                x={roomWidthPx - 8}
-                y={0}
-                width={16}
-                height={roomHeightPx}
-                fill="transparent"
-              />
-              {/* Visual edge line indicator on hover/drag */}
-              <line
-                x1={roomWidthPx}
-                y1={0}
-                x2={roomWidthPx}
-                y2={roomHeightPx}
-                stroke="#4f46e5"
-                strokeWidth={floorResize?.direction === 'e' ? 4 : 2}
-                strokeOpacity={floorResize?.direction === 'e' ? 1 : 0.4}
-                className="transition-opacity group-hover:stroke-opacity-100"
-              />
-              {/* East Handle Pill */}
-              <g transform={`translate(${roomWidthPx - 7}, ${roomHeightPx / 2 - 20})`}>
-                <rect
-                  width="14"
-                  height="40"
-                  rx="7"
-                  fill="#ffffff"
-                  stroke="#4f46e5"
-                  strokeWidth="2"
-                  className="shadow-md group-hover:scale-110 transition-transform origin-center"
-                />
-                <line x1="5" y1="14" x2="5" y2="26" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
-                <line x1="9" y1="14" x2="9" y2="26" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
-              </g>
-            </g>
+              return (
+                <g key={`wall-seg-${seg.index}`} className="group/wall">
+                  {/* Wall Segment Dimension Badge */}
+                  <g transform={`translate(${midPxX}, ${midPxY})`}>
+                    <rect
+                      x="-22"
+                      y="-10"
+                      width="44"
+                      height="20"
+                      rx="6"
+                      fill="#1e293b"
+                      fillOpacity="0.88"
+                      stroke="#475569"
+                      strokeWidth="1"
+                      className="shadow-sm"
+                    />
+                    <text
+                      x="0"
+                      y="3.5"
+                      textAnchor="middle"
+                      fontSize="9.5"
+                      fontWeight="700"
+                      fill="#f8fafc"
+                      className="pointer-events-none select-none"
+                    >
+                      {seg.length} {floorPlan.unit}
+                    </text>
 
-            {/* SOUTH HANDLE (Bottom border resize) */}
-            <g
-              id="handle-resize-south"
-              className="cursor-ns-resize group"
-              onPointerDown={(e) => handleFloorResizeStart(e, 's')}
-            >
-              {/* Generous invisible hit test zone */}
-              <rect
-                x={0}
-                y={roomHeightPx - 8}
-                width={roomWidthPx}
-                height={16}
-                fill="transparent"
-              />
-              {/* Visual edge line indicator on hover/drag */}
-              <line
-                x1={0}
-                y1={roomHeightPx}
-                x2={roomWidthPx}
-                y2={roomHeightPx}
-                stroke="#4f46e5"
-                strokeWidth={floorResize?.direction === 's' ? 4 : 2}
-                strokeOpacity={floorResize?.direction === 's' ? 1 : 0.4}
-                className="transition-opacity group-hover:stroke-opacity-100"
-              />
-              {/* South Handle Pill */}
-              <g transform={`translate(${roomWidthPx / 2 - 20}, ${roomHeightPx - 7})`}>
-                <rect
-                  width="40"
-                  height="14"
-                  rx="7"
-                  fill="#ffffff"
-                  stroke="#4f46e5"
-                  strokeWidth="2"
-                  className="shadow-md group-hover:scale-110 transition-transform origin-center"
-                />
-                <line x1="14" y1="5" x2="26" y2="5" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
-                <line x1="14" y1="9" x2="26" y2="9" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
-              </g>
-            </g>
-
-            {/* SOUTH-EAST CORNER HANDLE (Both dimensions resize) */}
-            <g
-              id="handle-resize-southeast"
-              className="cursor-nwse-resize group"
-              onPointerDown={(e) => handleFloorResizeStart(e, 'se')}
-            >
-              {/* Generous invisible hit test circle */}
-              <circle
-                cx={roomWidthPx}
-                cy={roomHeightPx}
-                r={24}
-                fill="transparent"
-              />
-              {/* Corner Badge */}
-              <g transform={`translate(${roomWidthPx - 13}, ${roomHeightPx - 13})`}>
-                <rect
-                  width="26"
-                  height="26"
-                  rx="8"
-                  fill="#4f46e5"
-                  stroke="#ffffff"
-                  strokeWidth="2.5"
-                  className="shadow-lg group-hover:scale-125 transition-transform origin-center"
-                />
-                {/* Diagonal resize arrows icon in white */}
-                <path
-                  d="M 8 18 L 18 8 M 12 8 L 18 8 L 18 14 M 14 18 L 8 18 L 8 12"
-                  fill="none"
-                  stroke="#ffffff"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </g>
-            </g>
-
-            {/* Live Dimensions Overlay HUD while actively resizing */}
-            {floorResize && (
-              <g
-                transform={`translate(${roomWidthPx + 16}, ${roomHeightPx + 16})`}
-                className="pointer-events-none drop-shadow-xl"
-              >
-                <rect
-                  x="0"
-                  y="0"
-                  width="140"
-                  height="54"
-                  rx="10"
-                  fill="#0f172a"
-                  fillOpacity="0.95"
-                  stroke="#6366f1"
-                  strokeWidth="1.5"
-                />
-                <text x="12" y="20" fill="#ffffff" fontSize="12" fontWeight="700">
-                  {effectiveRoomWidth} × {effectiveRoomHeight} {floorPlan.unit}
-                </text>
-                <text x="12" y="36" fill="#94a3b8" fontSize="10">
-                  {(effectiveRoomWidth * effectiveRoomHeight).toLocaleString()} sq {floorPlan.unit}
-                </text>
-                <text x="12" y="47" fill="#818cf8" fontSize="9" fontWeight="600">
-                  Release to apply
-                </text>
-              </g>
-            )}
+                    {/* Plus button to add corner / split wall right here */}
+                    {(isEditingWalls || activeTool === 'select') && (
+                      <g
+                        id={`btn-split-wall-${seg.index}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSplitWallEdge(seg.index);
+                        }}
+                        className="cursor-pointer opacity-70 hover:opacity-100 transition group-hover/wall:opacity-100"
+                        transform="translate(0, -22)"
+                      >
+                        <title>Click to add a corner / alter this wall</title>
+                        <circle r="9" fill="#4f46e5" stroke="#ffffff" strokeWidth="1.5" className="shadow-sm" />
+                        <path d="M -4 0 L 4 0 M 0 -4 L 0 4" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round" />
+                      </g>
+                    )}
+                  </g>
+                </g>
+              );
+            })}
           </g>
+
+          {/* Wall Corner Vertex Drag Handles */}
+          <g id="wall-vertices-group" className="select-none">
+            {(isEditingWalls || floorPlan.roomShape !== 'rectangle') &&
+              liveBoundaryPoints.map((pt, idx) => {
+                const pxX = pt.x * scaleRatio;
+                const pxY = pt.y * scaleRatio;
+                const isDraggingThis = draggedVertexIdx === idx;
+
+                return (
+                  <g
+                    key={`vertex-${idx}`}
+                    id={`vertex-handle-${idx}`}
+                    transform={`translate(${pxX}, ${pxY})`}
+                    onPointerDown={(e) => handleVertexPointerDown(e, idx)}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteVertex(idx);
+                    }}
+                    className="cursor-move group/vertex"
+                  >
+                    <title>Drag to move corner, Double click to remove (min 3)</title>
+                    {/* Generous hit area */}
+                    <circle r="20" fill="transparent" />
+
+                    {/* Outer ring */}
+                    <circle
+                      r={isDraggingThis ? 13 : 9}
+                      fill={isDraggingThis ? '#6366f1' : '#ffffff'}
+                      stroke="#4f46e5"
+                      strokeWidth={isDraggingThis ? 3 : 2.5}
+                      className="shadow-md transition-all group-hover/vertex:scale-125 origin-center"
+                    />
+
+                    {/* Inner dot */}
+                    <circle
+                      r={isDraggingThis ? 4 : 3}
+                      fill={isDraggingThis ? '#ffffff' : '#4f46e5'}
+                    />
+
+                    {/* Coordinate badge */}
+                    <g transform="translate(0, -18)" className="pointer-events-none select-none">
+                      <rect
+                        x="-22"
+                        y="-13"
+                        width="44"
+                        height="14"
+                        rx="4"
+                        fill="#0f172a"
+                        fillOpacity="0.9"
+                      />
+                      <text
+                        x="0"
+                        y="-3"
+                        textAnchor="middle"
+                        fontSize="8"
+                        fontWeight="bold"
+                        fill="#38bdf8"
+                      >
+                        {pt.x},{pt.y}
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
+          </g>
+
+          {/* Interactive Floor Canvas Resizing Handles & Guides (For classic rectangle view) */}
+          {(!floorPlan.roomShape || floorPlan.roomShape === 'rectangle') && !isEditingWalls && (
+            <g id="floor-canvas-resize-controls" className="select-none">
+              {/* Live resize dashed guide perimeter if actively dragging */}
+              {floorResize && (
+                <rect
+                  x={0}
+                  y={0}
+                  width={roomWidthPx}
+                  height={roomHeightPx}
+                  fill="none"
+                  stroke="#6366f1"
+                  strokeWidth="3"
+                  strokeDasharray="6 4"
+                  className="pointer-events-none"
+                />
+              )}
+
+              {/* EAST HANDLE (Right border resize) */}
+              <g
+                id="handle-resize-east"
+                className="cursor-ew-resize group"
+                onPointerDown={(e) => handleFloorResizeStart(e, 'e')}
+              >
+                {/* Generous invisible hit test zone */}
+                <rect
+                  x={roomWidthPx - 8}
+                  y={0}
+                  width={16}
+                  height={roomHeightPx}
+                  fill="transparent"
+                />
+                {/* Visual edge line indicator on hover/drag */}
+                <line
+                  x1={roomWidthPx}
+                  y1={0}
+                  x2={roomWidthPx}
+                  y2={roomHeightPx}
+                  stroke="#4f46e5"
+                  strokeWidth={floorResize?.direction === 'e' ? 4 : 2}
+                  strokeOpacity={floorResize?.direction === 'e' ? 1 : 0.4}
+                  className="transition-opacity group-hover:stroke-opacity-100"
+                />
+                {/* East Handle Pill */}
+                <g transform={`translate(${roomWidthPx - 7}, ${roomHeightPx / 2 - 20})`}>
+                  <rect
+                    width="14"
+                    height="40"
+                    rx="7"
+                    fill="#ffffff"
+                    stroke="#4f46e5"
+                    strokeWidth="2"
+                    className="shadow-md group-hover:scale-110 transition-transform origin-center"
+                  />
+                  <line x1="5" y1="14" x2="5" y2="26" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="9" y1="14" x2="9" y2="26" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+                </g>
+              </g>
+
+              {/* SOUTH HANDLE (Bottom border resize) */}
+              <g
+                id="handle-resize-south"
+                className="cursor-ns-resize group"
+                onPointerDown={(e) => handleFloorResizeStart(e, 's')}
+              >
+                {/* Generous invisible hit test zone */}
+                <rect
+                  x={0}
+                  y={roomHeightPx - 8}
+                  width={roomWidthPx}
+                  height={16}
+                  fill="transparent"
+                />
+                {/* Visual edge line indicator on hover/drag */}
+                <line
+                  x1={0}
+                  y1={roomHeightPx}
+                  x2={roomWidthPx}
+                  y2={roomHeightPx}
+                  stroke="#4f46e5"
+                  strokeWidth={floorResize?.direction === 's' ? 4 : 2}
+                  strokeOpacity={floorResize?.direction === 's' ? 1 : 0.4}
+                  className="transition-opacity group-hover:stroke-opacity-100"
+                />
+                {/* South Handle Pill */}
+                <g transform={`translate(${roomWidthPx / 2 - 20}, ${roomHeightPx - 7})`}>
+                  <rect
+                    width="40"
+                    height="14"
+                    rx="7"
+                    fill="#ffffff"
+                    stroke="#4f46e5"
+                    strokeWidth="2"
+                    className="shadow-md group-hover:scale-110 transition-transform origin-center"
+                  />
+                  <line x1="14" y1="5" x2="26" y2="5" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="14" y1="9" x2="26" y2="9" stroke="#4f46e5" strokeWidth="1.5" strokeLinecap="round" />
+                </g>
+              </g>
+
+              {/* SOUTH-EAST CORNER HANDLE (Both dimensions resize) */}
+              <g
+                id="handle-resize-southeast"
+                className="cursor-nwse-resize group"
+                onPointerDown={(e) => handleFloorResizeStart(e, 'se')}
+              >
+                {/* Generous invisible hit test circle */}
+                <circle
+                  cx={roomWidthPx}
+                  cy={roomHeightPx}
+                  r={24}
+                  fill="transparent"
+                />
+                {/* Corner Badge */}
+                <g transform={`translate(${roomWidthPx - 13}, ${roomHeightPx - 13})`}>
+                  <rect
+                    width="26"
+                    height="26"
+                    rx="8"
+                    fill="#4f46e5"
+                    stroke="#ffffff"
+                    strokeWidth="2.5"
+                    className="shadow-lg group-hover:scale-125 transition-transform origin-center"
+                  />
+                  {/* Diagonal resize arrows icon in white */}
+                  <path
+                    d="M 8 18 L 18 8 M 12 8 L 18 8 L 18 14 M 14 18 L 8 18 L 8 12"
+                    fill="none"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </g>
+              </g>
+
+              {/* Live Dimensions Overlay HUD while actively resizing */}
+              {floorResize && (
+                <g
+                  transform={`translate(${roomWidthPx + 16}, ${roomHeightPx + 16})`}
+                  className="pointer-events-none drop-shadow-xl"
+                >
+                  <rect
+                    x="0"
+                    y="0"
+                    width="140"
+                    height="54"
+                    rx="10"
+                    fill="#0f172a"
+                    fillOpacity="0.95"
+                    stroke="#6366f1"
+                    strokeWidth="1.5"
+                  />
+                  <text x="12" y="20" fill="#ffffff" fontSize="12" fontWeight="700">
+                    {effectiveRoomWidth} × {effectiveRoomHeight} {floorPlan.unit}
+                  </text>
+                  <text x="12" y="36" fill="#94a3b8" fontSize="10">
+                    {(effectiveRoomWidth * effectiveRoomHeight).toLocaleString()} sq {floorPlan.unit}
+                  </text>
+                  <text x="12" y="47" fill="#818cf8" fontSize="9" fontWeight="600">
+                    Release to apply
+                  </text>
+                </g>
+              )}
+            </g>
+          )}
         </svg>
       </div>
 

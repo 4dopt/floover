@@ -1,6 +1,6 @@
 {
   "name": "Floordone",
-  "description": "Intuitive drag-and-drop floor plan designer for restaurants and event planners with table covers, real-time team collaboration, room templates, cloud sync, and PDF export.",
+  "description": "Intuitive drag-and-drop floor plan designer with custom hall shapes (L-shape, T-shape, angled walls), interactive 3D venue walkthrough, table covers, real-time collaboration, and export.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
