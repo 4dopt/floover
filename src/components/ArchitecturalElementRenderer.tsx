@@ -1223,6 +1223,70 @@ export const ArchitecturalElementRenderer: React.FC<ArchitecturalElementRenderer
       );
     }
 
+    case 'fixture-buffet': {
+      return (
+        <g className="fixture-buffet select-none">
+          {/* Main buffet table body */}
+          <rect
+            x={-hw}
+            y={-hh}
+            width={w}
+            height={h}
+            fill="#334155"
+            stroke={strokeColor}
+            strokeWidth={strokeWidth}
+            rx="3"
+          />
+          {/* Sneeze guard glass edge */}
+          <line
+            x1={-hw + 6}
+            y1={-hh + 6}
+            x2={hw - 6}
+            y2={-hh + 6}
+            stroke="#38bdf8"
+            strokeWidth="1.5"
+            strokeOpacity="0.8"
+          />
+          {/* Stainless steel chafing dishes */}
+          {[-hw + w * 0.25, 0, hw - w * 0.25].map((cx, idx) => (
+            <g key={idx}>
+              <rect
+                x={cx - 16}
+                y={-hh + 12}
+                width="32"
+                height={Math.max(16, h - 22)}
+                fill="#cbd5e1"
+                stroke="#64748b"
+                strokeWidth="1"
+                rx="2"
+              />
+              <rect
+                x={cx - 12}
+                y={-hh + 15}
+                width="24"
+                height={Math.max(10, h - 28)}
+                fill="#f1f5f9"
+                stroke="#94a3b8"
+                strokeWidth="0.8"
+                rx="4"
+              />
+            </g>
+          ))}
+          <text
+            x="0"
+            y={hh + 11}
+            textAnchor="middle"
+            fontSize="8.5"
+            fontWeight="bold"
+            fill="#475569"
+            className="pointer-events-none"
+          >
+            Buffet Station
+          </text>
+        </g>
+      );
+    }
+
     case 'fixture-stage': {
       return (
         <g className="fixture-stage select-none">

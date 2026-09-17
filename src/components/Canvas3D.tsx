@@ -35,6 +35,7 @@ import {
 import { FloorPlan, FloorElement, Point2D, TableStatus } from '../types';
 import { getEffectiveBoundaryPoints } from '../utils/roomGeometry';
 import { getChairPositions } from '../utils/chairLayout';
+import { getElementSubtype } from './ArchitecturalElementRenderer';
 
 // Helper to test if a 3D coordinate is safely within the room floor boundary
 function isInsideRoom(
@@ -1478,6 +1479,226 @@ function createCheckeredDanceFloorTexture(): THREE.CanvasTexture {
   return texture;
 }
 
+let cachedRestroomSignTex: THREE.CanvasTexture | null = null;
+function createRestroomSignTexture(): THREE.CanvasTexture {
+  if (cachedRestroomSignTex) return cachedRestroomSignTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  // High-contrast deep cyan/navy background with subtle gradient
+  const grad = ctx.createLinearGradient(0, 0, 512, 256);
+  grad.addColorStop(0, '#0284c7');
+  grad.addColorStop(1, '#0369a1');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 256);
+
+  // Outer border & inner luminous highlight line
+  ctx.strokeStyle = '#38bdf8';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(10, 10, 492, 236);
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(20, 20, 472, 216);
+
+  // Restroom Icon & Text
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Crisp symbols (Men, Women, Accessibility)
+  ctx.font = 'bold 64px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
+  ctx.fillText('🚻  ♿', 256, 80);
+
+  // Bold high-contrast typography
+  ctx.font = '900 46px "Plus Jakarta Sans", system-ui, sans-serif';
+  ctx.fillText('RESTROOMS', 256, 155);
+
+  // Subtitle
+  ctx.fillStyle = '#bae6fd';
+  ctx.font = '700 20px "Plus Jakarta Sans", system-ui, sans-serif';
+  ctx.fillText('GUEST FACILITIES • ACCESSIBLE', 256, 204);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  cachedRestroomSignTex = texture;
+  return texture;
+}
+
+let cachedExitSignTex: THREE.CanvasTexture | null = null;
+function createEmergencyExitSignTexture(): THREE.CanvasTexture {
+  if (cachedExitSignTex) return cachedExitSignTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 180;
+  const ctx = canvas.getContext('2d')!;
+
+  // High-visibility illuminated green safety background
+  const grad = ctx.createLinearGradient(0, 0, 512, 0);
+  grad.addColorStop(0, '#15803d');
+  grad.addColorStop(0.5, '#16a34a');
+  grad.addColorStop(1, '#15803d');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 512, 180);
+
+  // White border
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 8;
+  ctx.strokeRect(8, 8, 496, 164);
+
+  // Exit Typography
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '900 64px "Plus Jakarta Sans", system-ui, sans-serif';
+  ctx.fillText('EXIT ➔', 256, 75);
+
+  ctx.fillStyle = '#bbf7d0';
+  ctx.font = '700 22px "Plus Jakarta Sans", system-ui, sans-serif';
+  ctx.fillText('EMERGENCY EGRESS ONLY', 256, 134);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  cachedExitSignTex = texture;
+  return texture;
+}
+
+let cachedDjConsoleTex: THREE.CanvasTexture | null = null;
+function createDjConsoleTexture(): THREE.CanvasTexture {
+  if (cachedDjConsoleTex) return cachedDjConsoleTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  // Obsidian console body
+  ctx.fillStyle = '#0f172a';
+  ctx.fillRect(0, 0, 512, 256);
+
+  // Left & right turntable platters
+  [120, 392].forEach((cx) => {
+    ctx.beginPath();
+    ctx.arc(cx, 128, 85, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e293b';
+    ctx.fill();
+    ctx.strokeStyle = '#6366f1';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    for (let r = 70; r > 30; r -= 10) {
+      ctx.beginPath();
+      ctx.arc(cx, 128, r, 0, Math.PI * 2);
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    ctx.beginPath();
+    ctx.arc(cx, 128, 26, 0, Math.PI * 2);
+    ctx.fillStyle = '#f43f5e';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(cx, 128, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+  });
+
+  // Center mixer channel strips & glowing VU meters
+  ctx.fillStyle = '#1e1b4b';
+  ctx.fillRect(216, 20, 80, 216);
+  ctx.strokeStyle = '#4338ca';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(216, 20, 80, 216);
+
+  const colors = ['#22c55e', '#22c55e', '#eab308', '#ef4444'];
+  for (let ch = 0; ch < 2; ch++) {
+    const x = 236 + ch * 24;
+    for (let b = 0; b < 4; b++) {
+      ctx.fillStyle = colors[b];
+      ctx.fillRect(x, 40 + (3 - b) * 16, 16, 10);
+    }
+  }
+
+  // Crossfader slider
+  ctx.fillStyle = '#312e81';
+  ctx.fillRect(230, 165, 52, 10);
+  ctx.fillStyle = '#e0e7ff';
+  ctx.fillRect(250, 158, 12, 24);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  cachedDjConsoleTex = texture;
+  return texture;
+}
+
+let cachedPosScreenTex: THREE.CanvasTexture | null = null;
+function createPosScreenTexture(): THREE.CanvasTexture {
+  if (cachedPosScreenTex) return cachedPosScreenTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#091e3a';
+  ctx.fillRect(0, 0, 256, 256);
+
+  // Header bar
+  ctx.fillStyle = '#0284c7';
+  ctx.fillRect(0, 0, 256, 36);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 16px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('FLOORDONE POS', 12, 24);
+
+  // Table grid blocks
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const isOccupied = (r + c) % 2 === 0;
+      ctx.fillStyle = isOccupied ? '#16a34a' : '#2563eb';
+      ctx.fillRect(16 + c * 76, 50 + r * 56, 68, 48);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`T-${r * 3 + c + 1}`, 16 + c * 76 + 34, 76 + r * 56);
+      ctx.font = '10px sans-serif';
+      ctx.fillText(isOccupied ? 'ACTIVE' : 'OPEN', 16 + c * 76 + 34, 90 + r * 56);
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  cachedPosScreenTex = texture;
+  return texture;
+}
+
+let cachedWoodPlankDeckTex: THREE.CanvasTexture | null = null;
+function createWoodPlankDeckTexture(): THREE.CanvasTexture {
+  if (cachedWoodPlankDeckTex) return cachedWoodPlankDeckTex;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.fillStyle = '#b45309';
+  ctx.fillRect(0, 0, 512, 512);
+
+  const plankW = 64;
+  for (let x = 0; x < 512; x += plankW) {
+    ctx.fillStyle = (x / plankW) % 2 === 0 ? '#d97706' : '#b45309';
+    ctx.fillRect(x + 1, 0, plankW - 2, 512);
+
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, 0, plankW, 512);
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 2);
+  cachedWoodPlankDeckTex = texture;
+  return texture;
+}
+
 // ==========================================
 // Three.js Helper Functions for Scene Build
 // ==========================================
@@ -2062,6 +2283,106 @@ function createFurnitureMeshes(
     metalness: 0.25
   });
 
+  const restroomSignTex = createRestroomSignTexture();
+  const restroomSignMat = new THREE.MeshBasicMaterial({
+    map: restroomSignTex,
+    transparent: true
+  });
+
+  const exitSignTex = createEmergencyExitSignTexture();
+  const exitSignMat = new THREE.MeshBasicMaterial({
+    map: exitSignTex,
+    transparent: true
+  });
+
+  const djConsoleTex = createDjConsoleTexture();
+  const djConsoleMat = new THREE.MeshBasicMaterial({
+    map: djConsoleTex
+  });
+
+  const posScreenTex = createPosScreenTexture();
+  const posScreenMat = new THREE.MeshBasicMaterial({
+    map: posScreenTex
+  });
+
+  const woodPlankDeckTex = createWoodPlankDeckTexture();
+  const woodPlankDeckMat = new THREE.MeshStandardMaterial({
+    map: woodPlankDeckTex,
+    roughness: 0.55
+  });
+
+  // Architectural & Fixture Materials (High contrast & realistic, not black!)
+  const drywallMat = new THREE.MeshStandardMaterial({
+    color: 0xf1f5f9, // Architectural off-white
+    roughness: 0.85,
+    metalness: 0.05
+  });
+
+  const halfWallCapMat = new THREE.MeshStandardMaterial({
+    color: 0x78350f, // Warm wood cap
+    roughness: 0.35,
+    metalness: 0.1
+  });
+
+  const glassPartitionMat = new THREE.MeshPhysicalMaterial({
+    color: 0xf0f9ff,
+    transparent: true,
+    opacity: 0.45,
+    roughness: 0.1,
+    transmission: 0.9,
+    ior: 1.5
+  });
+
+  const restroomWallMat = new THREE.MeshStandardMaterial({
+    color: 0xe2e8f0, // Clean light slate commercial tile
+    roughness: 0.4,
+    metalness: 0.08
+  });
+
+  const concreteMat = new THREE.MeshStandardMaterial({
+    color: 0x94a3b8, // Architectural cast stone
+    roughness: 0.7,
+    metalness: 0.05
+  });
+
+  const stainlessSteelMat = new THREE.MeshStandardMaterial({
+    color: 0xd1d5db, // Polished stainless steel
+    roughness: 0.22,
+    metalness: 0.88
+  });
+
+  const heatLampMat = new THREE.MeshBasicMaterial({
+    color: 0xf97316 // Glowing heat lamp orange
+  });
+
+  const umbrellaFabricMat = new THREE.MeshStandardMaterial({
+    color: 0xf59e0b, // Warm golden canvas
+    roughness: 0.65,
+    metalness: 0.05
+  });
+
+  const pergolaTimberMat = new THREE.MeshStandardMaterial({
+    color: 0x92400e, // Rich timber brown
+    roughness: 0.6,
+    metalness: 0.05
+  });
+
+  const floralBlossomMat = new THREE.MeshStandardMaterial({
+    color: 0xf472b6, // Pink floral
+    roughness: 0.5
+  });
+
+  const floralCreamMat = new THREE.MeshStandardMaterial({
+    color: 0xfef08a, // Pale cream floral
+    roughness: 0.5
+  });
+
+  const stoneDeckMat = new THREE.MeshStandardMaterial({
+    color: 0x64748b, // Flagstone / slate grey
+    roughness: 0.8,
+    metalness: 0.05
+  });
+
   elements.forEach((el) => {
     const posX = (el.x + el.width / 2) * scale;
     const posZ = (el.y + el.height / 2) * scale;
@@ -2303,9 +2624,461 @@ function createFurnitureMeshes(
           }
         });
       }
-    } else if (el.type === 'architectural') {
-      if (el.subtype?.includes('stage') || el.name.toLowerCase().includes('stage')) {
-        // Stage Platform with velvet front skirt
+    } else {
+      const subtype = getElementSubtype(el);
+
+      if (subtype === 'fixture-restrooms') {
+        const kioskH = 7.2;
+        // Main architectural kiosk body (clean modern off-white commercial tile finish)
+        const bodyGeo = new THREE.BoxGeometry(width3D, kioskH, depth3D);
+        const bodyMesh = new THREE.Mesh(bodyGeo, restroomWallMat);
+        bodyMesh.position.y = kioskH / 2;
+        bodyMesh.castShadow = true;
+        bodyMesh.receiveShadow = true;
+        elGroup.add(bodyMesh);
+        interactiveMap.set(bodyMesh, el);
+
+        // Brushed aluminum base plinth & top cap
+        const plinthGeo = new THREE.BoxGeometry(width3D + 0.12, 0.25, depth3D + 0.12);
+        const plinthMesh = new THREE.Mesh(plinthGeo, metalLegMat);
+        plinthMesh.position.y = 0.125;
+        elGroup.add(plinthMesh);
+
+        const capGeo = new THREE.BoxGeometry(width3D + 0.12, 0.2, depth3D + 0.12);
+        const capMesh = new THREE.Mesh(capGeo, metalLegMat);
+        capMesh.position.y = kioskH;
+        elGroup.add(capMesh);
+
+        // High-contrast illuminated signage plaque on Front & Back
+        const signW = Math.min(width3D * 0.88, 3.8);
+        const signH = signW * 0.5;
+        const signGeo = new THREE.PlaneGeometry(signW, signH);
+
+        // Front Sign Plaque
+        const frontSignMesh = new THREE.Mesh(signGeo, restroomSignMat);
+        frontSignMesh.position.set(0, 4.6, depth3D / 2 + 0.03);
+        elGroup.add(frontSignMesh);
+        interactiveMap.set(frontSignMesh, el);
+
+        // Back Sign Plaque
+        const backSignMesh = new THREE.Mesh(signGeo, restroomSignMat);
+        backSignMesh.rotation.y = Math.PI;
+        backSignMesh.position.set(0, 4.6, -depth3D / 2 - 0.03);
+        elGroup.add(backSignMesh);
+        interactiveMap.set(backSignMesh, el);
+
+        // Cantilevered modern light sconce above both signs
+        const sconceGeo = new THREE.BoxGeometry(signW * 1.05, 0.12, 0.25);
+        const sconceFront = new THREE.Mesh(sconceGeo, goldMetallicMat);
+        sconceFront.position.set(0, 4.6 + signH / 2 + 0.15, depth3D / 2 + 0.12);
+        elGroup.add(sconceFront);
+
+        const sconceBack = new THREE.Mesh(sconceGeo, goldMetallicMat);
+        sconceBack.position.set(0, 4.6 + signH / 2 + 0.15, -depth3D / 2 - 0.12);
+        elGroup.add(sconceBack);
+
+        // Subtle recessed stall doors on the front face
+        const stallW = Math.min(width3D * 0.38, 2.4);
+        const stallH = kioskH * 0.68;
+        const stallGeo = new THREE.BoxGeometry(stallW, stallH, 0.04);
+
+        const stall1 = new THREE.Mesh(stallGeo, whiteLinenMat);
+        stall1.position.set(-width3D * 0.24, kioskH * 0.4, depth3D / 2 + 0.015);
+        elGroup.add(stall1);
+
+        const stall2 = new THREE.Mesh(stallGeo, whiteLinenMat);
+        stall2.position.set(width3D * 0.24, kioskH * 0.4, depth3D / 2 + 0.015);
+        elGroup.add(stall2);
+
+        // Vertical handles on stall doors
+        const handleGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.55, 8);
+        const h1 = new THREE.Mesh(handleGeo, stainlessSteelMat);
+        h1.position.set(-width3D * 0.24 + stallW * 0.38, kioskH * 0.4, depth3D / 2 + 0.05);
+        elGroup.add(h1);
+
+        const h2 = new THREE.Mesh(handleGeo, stainlessSteelMat);
+        h2.position.set(width3D * 0.24 - stallW * 0.38, kioskH * 0.4, depth3D / 2 + 0.05);
+        elGroup.add(h2);
+      } else if (subtype === 'door-emergency') {
+        const doorH = 7.4;
+        const frameGeo = new THREE.BoxGeometry(width3D, doorH, 0.4);
+        const frameMesh = new THREE.Mesh(frameGeo, metalLegMat);
+        frameMesh.position.y = doorH / 2;
+        frameMesh.castShadow = true;
+        elGroup.add(frameMesh);
+        interactiveMap.set(frameMesh, el);
+
+        // Door slab
+        const slabGeo = new THREE.BoxGeometry(width3D * 0.88, doorH * 0.94, 0.16);
+        const slabMesh = new THREE.Mesh(slabGeo, restroomWallMat);
+        slabMesh.position.y = doorH / 2;
+        elGroup.add(slabMesh);
+
+        // Panic crash push-bar
+        const barGeo = new THREE.CylinderGeometry(0.04, 0.04, width3D * 0.75, 12);
+        const barMesh = new THREE.Mesh(barGeo, stainlessSteelMat);
+        barMesh.rotation.z = Math.PI / 2;
+        barMesh.position.set(0, 3.2, 0.15);
+        elGroup.add(barMesh);
+
+        // Illuminated 3D Exit Sign Box
+        const exitBoxGeo = new THREE.BoxGeometry(Math.min(width3D * 0.85, 3.2), 1.05, 0.25);
+        const exitSignMesh = new THREE.Mesh(exitBoxGeo, exitSignMat);
+        exitSignMesh.position.set(0, doorH + 0.6, 0);
+        elGroup.add(exitSignMesh);
+      } else if (subtype === 'door-single') {
+        const doorH = 7.2;
+        const frameGeo = new THREE.BoxGeometry(width3D, doorH, 0.35);
+        const frameMesh = new THREE.Mesh(frameGeo, metalLegMat);
+        frameMesh.position.y = doorH / 2;
+        frameMesh.castShadow = true;
+        elGroup.add(frameMesh);
+        interactiveMap.set(frameMesh, el);
+
+        // Open door leaf swung 25°
+        const leafW = width3D * 0.85;
+        const leafGroup = new THREE.Group();
+        leafGroup.position.set(-width3D * 0.42, 0, 0);
+        leafGroup.rotation.y = -0.45;
+        elGroup.add(leafGroup);
+
+        const leafGeo = new THREE.BoxGeometry(leafW, doorH * 0.96, 0.12);
+        const leafMesh = new THREE.Mesh(leafGeo, woodTableMat);
+        leafMesh.position.set(leafW / 2, doorH / 2, 0);
+        leafMesh.castShadow = true;
+        leafGroup.add(leafMesh);
+
+        // Lever handle
+        const leverGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.3, 8);
+        const leverMesh = new THREE.Mesh(leverGeo, goldMetallicMat);
+        leverMesh.rotation.z = Math.PI / 2;
+        leverMesh.position.set(leafW - 0.2, 3.2, 0.1);
+        leafGroup.add(leverMesh);
+      } else if (subtype === 'door-double') {
+        const doorH = 7.5;
+        const frameGeo = new THREE.BoxGeometry(width3D, doorH, 0.4);
+        const frameMesh = new THREE.Mesh(frameGeo, metalLegMat);
+        frameMesh.position.y = doorH / 2;
+        frameMesh.castShadow = true;
+        elGroup.add(frameMesh);
+        interactiveMap.set(frameMesh, el);
+
+        const leafW = width3D * 0.44;
+        [-width3D * 0.23, width3D * 0.23].forEach((lx) => {
+          const leafGeo = new THREE.BoxGeometry(leafW, doorH * 0.95, 0.12);
+          const leafMesh = new THREE.Mesh(leafGeo, woodTableMat);
+          leafMesh.position.set(lx, doorH / 2, 0);
+          leafMesh.castShadow = true;
+          elGroup.add(leafMesh);
+
+          // Vertical pull handle
+          const pullGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.8, 8);
+          const pullMesh = new THREE.Mesh(pullGeo, stainlessSteelMat);
+          pullMesh.position.set(lx + (lx > 0 ? -leafW * 0.35 : leafW * 0.35), 3.4, 0.12);
+          elGroup.add(pullMesh);
+        });
+      } else if (subtype === 'door-sliding') {
+        const doorH = 7.4;
+        const frameGeo = new THREE.BoxGeometry(width3D, doorH, 0.3);
+        const frameMesh = new THREE.Mesh(frameGeo, metalLegMat);
+        frameMesh.position.y = doorH / 2;
+        elGroup.add(frameMesh);
+        interactiveMap.set(frameMesh, el);
+
+        // Glass sliding panels
+        const panelW = width3D * 0.48;
+        const p1 = new THREE.Mesh(new THREE.BoxGeometry(panelW, doorH * 0.94, 0.08), glassPartitionMat);
+        p1.position.set(-width3D * 0.22, doorH / 2, 0.04);
+        elGroup.add(p1);
+
+        const p2 = new THREE.Mesh(new THREE.BoxGeometry(panelW, doorH * 0.94, 0.08), glassPartitionMat);
+        p2.position.set(width3D * 0.22, doorH / 2, -0.04);
+        elGroup.add(p2);
+      } else if (subtype === 'opening-arch') {
+        const openH = 8.5;
+        const jambW = Math.max(0.4, width3D * 0.12);
+        // Left & Right Jambs
+        const jambGeo = new THREE.BoxGeometry(jambW, openH, depth3D);
+        const leftJamb = new THREE.Mesh(jambGeo, drywallMat);
+        leftJamb.position.set(-width3D / 2 + jambW / 2, openH / 2, 0);
+        elGroup.add(leftJamb);
+
+        const rightJamb = new THREE.Mesh(jambGeo, drywallMat);
+        rightJamb.position.set(width3D / 2 - jambW / 2, openH / 2, 0);
+        elGroup.add(rightJamb);
+
+        // Overhead Header Arch
+        const headerGeo = new THREE.BoxGeometry(width3D, 1.4, depth3D);
+        const header = new THREE.Mesh(headerGeo, drywallMat);
+        header.position.set(0, openH - 0.7, 0);
+        elGroup.add(header);
+        interactiveMap.set(header, el);
+      } else if (subtype === 'window-exterior') {
+        const winH = 5.0;
+        const sillH = 2.4;
+        // Lower wall sill
+        const sillGeo = new THREE.BoxGeometry(width3D, sillH, depth3D);
+        const sillMesh = new THREE.Mesh(sillGeo, drywallMat);
+        sillMesh.position.y = sillH / 2;
+        elGroup.add(sillMesh);
+
+        // Glass pane
+        const glassGeo = new THREE.BoxGeometry(width3D * 0.96, winH, 0.12);
+        const glassMesh = new THREE.Mesh(glassGeo, glassPartitionMat);
+        glassMesh.position.y = sillH + winH / 2;
+        elGroup.add(glassMesh);
+        interactiveMap.set(glassMesh, el);
+
+        // Muntin dividers
+        const muntinV = new THREE.Mesh(new THREE.BoxGeometry(0.08, winH, 0.16), metalLegMat);
+        muntinV.position.y = sillH + winH / 2;
+        elGroup.add(muntinV);
+      } else if (subtype === 'wall-solid') {
+        const wallH = 8.5;
+        const wallGeo = new THREE.BoxGeometry(width3D, wallH, depth3D);
+        const wallMesh = new THREE.Mesh(wallGeo, drywallMat);
+        wallMesh.position.y = wallH / 2;
+        wallMesh.castShadow = true;
+        wallMesh.receiveShadow = true;
+        elGroup.add(wallMesh);
+        interactiveMap.set(wallMesh, el);
+
+        // Bottom baseboard trim
+        const trimGeo = new THREE.BoxGeometry(width3D + 0.05, 0.4, depth3D + 0.05);
+        const trimMesh = new THREE.Mesh(trimGeo, metalLegMat);
+        trimMesh.position.y = 0.2;
+        elGroup.add(trimMesh);
+      } else if (subtype === 'wall-half') {
+        const halfH = 3.5;
+        const halfGeo = new THREE.BoxGeometry(width3D, halfH, depth3D);
+        const halfMesh = new THREE.Mesh(halfGeo, drywallMat);
+        halfMesh.position.y = halfH / 2;
+        halfMesh.castShadow = true;
+        elGroup.add(halfMesh);
+        interactiveMap.set(halfMesh, el);
+
+        // Finished wood cap rail
+        const capGeo = new THREE.BoxGeometry(width3D + 0.15, 0.16, depth3D + 0.15);
+        const capMesh = new THREE.Mesh(capGeo, halfWallCapMat);
+        capMesh.position.y = halfH + 0.08;
+        elGroup.add(capMesh);
+      } else if (subtype === 'wall-glass') {
+        const glassH = 5.5;
+        const glassGeo = new THREE.BoxGeometry(width3D, glassH, depth3D * 0.4);
+        const glassMesh = new THREE.Mesh(glassGeo, glassPartitionMat);
+        glassMesh.position.y = glassH / 2 + 0.2;
+        elGroup.add(glassMesh);
+        interactiveMap.set(glassMesh, el);
+
+        // Stainless base shoe channel
+        const baseGeo = new THREE.BoxGeometry(width3D + 0.1, 0.2, depth3D * 0.6);
+        const baseMesh = new THREE.Mesh(baseGeo, stainlessSteelMat);
+        baseMesh.position.y = 0.1;
+        elGroup.add(baseMesh);
+      } else if (subtype === 'column-round') {
+        const radius = Math.max(0.4, width3D / 2);
+        const colH = 12;
+        const colGeo = new THREE.CylinderGeometry(radius, radius, colH, 32);
+        const colMesh = new THREE.Mesh(colGeo, concreteMat);
+        colMesh.position.y = colH / 2;
+        colMesh.castShadow = true;
+        elGroup.add(colMesh);
+        interactiveMap.set(colMesh, el);
+
+        // Base & Capital rings
+        const ringGeo = new THREE.CylinderGeometry(radius * 1.15, radius * 1.25, 0.4, 32);
+        const baseRing = new THREE.Mesh(ringGeo, concreteMat);
+        baseRing.position.y = 0.2;
+        elGroup.add(baseRing);
+      } else if (subtype === 'column-square') {
+        const colH = 12;
+        const colGeo = new THREE.BoxGeometry(width3D, colH, depth3D);
+        const colMesh = new THREE.Mesh(colGeo, concreteMat);
+        colMesh.position.y = colH / 2;
+        colMesh.castShadow = true;
+        elGroup.add(colMesh);
+        interactiveMap.set(colMesh, el);
+
+        const baseGeo = new THREE.BoxGeometry(width3D * 1.15, 0.4, depth3D * 1.15);
+        const baseMesh = new THREE.Mesh(baseGeo, concreteMat);
+        baseMesh.position.y = 0.2;
+        elGroup.add(baseMesh);
+      } else if (subtype === 'fixture-host') {
+        const hostH = 3.8;
+        const podiumGeo = new THREE.BoxGeometry(width3D, hostH, depth3D);
+        const podiumMesh = new THREE.Mesh(podiumGeo, woodTableMat);
+        podiumMesh.position.y = hostH / 2;
+        podiumMesh.castShadow = true;
+        elGroup.add(podiumMesh);
+        interactiveMap.set(podiumMesh, el);
+
+        // Slanted top reading shelf
+        const shelfGeo = new THREE.BoxGeometry(width3D * 0.9, 0.08, depth3D * 0.9);
+        const shelfMesh = new THREE.Mesh(shelfGeo, barCounterMat);
+        shelfMesh.rotation.x = 0.2;
+        shelfMesh.position.set(0, hostH + 0.1, 0);
+        elGroup.add(shelfMesh);
+
+        // Guest check tablet display
+        const tabletGeo = new THREE.BoxGeometry(width3D * 0.45, 0.04, depth3D * 0.45);
+        const tabletMesh = new THREE.Mesh(tabletGeo, posScreenMat);
+        tabletMesh.rotation.x = 0.2;
+        tabletMesh.position.set(0, hostH + 0.18, 0);
+        elGroup.add(tabletMesh);
+
+        // Brass front plaque
+        const plaqueGeo = new THREE.BoxGeometry(width3D * 0.6, 0.35, 0.04);
+        const plaqueMesh = new THREE.Mesh(plaqueGeo, goldMetallicMat);
+        plaqueMesh.position.set(0, hostH * 0.75, depth3D / 2 + 0.02);
+        elGroup.add(plaqueMesh);
+      } else if (subtype === 'fixture-pos') {
+        const posH = 3.2;
+        const cabinetGeo = new THREE.BoxGeometry(width3D, posH, depth3D);
+        const cabinetMesh = new THREE.Mesh(cabinetGeo, woodTableMat);
+        cabinetMesh.position.y = posH / 2;
+        cabinetMesh.castShadow = true;
+        elGroup.add(cabinetMesh);
+        interactiveMap.set(cabinetMesh, el);
+
+        // POS screen terminal on articulated stem
+        const stemGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 10);
+        const stem = new THREE.Mesh(stemGeo, metalLegMat);
+        stem.position.set(0, posH + 0.3, 0);
+        elGroup.add(stem);
+
+        const screenGeo = new THREE.BoxGeometry(Math.min(width3D * 0.65, 1.4), 1.0, 0.08);
+        const screenMesh = new THREE.Mesh(screenGeo, posScreenMat);
+        screenMesh.rotation.x = -0.3;
+        screenMesh.position.set(0, posH + 0.7, 0);
+        elGroup.add(screenMesh);
+      } else if (subtype === 'fixture-dj') {
+        const deskH = 3.4;
+        const deskGeo = new THREE.BoxGeometry(width3D, deskH, depth3D);
+        const deskMesh = new THREE.Mesh(deskGeo, barCounterMat);
+        deskMesh.position.y = deskH / 2;
+        deskMesh.castShadow = true;
+        elGroup.add(deskMesh);
+        interactiveMap.set(deskMesh, el);
+
+        // Turntable and mixer console surface
+        const consoleGeo = new THREE.PlaneGeometry(width3D * 0.95, depth3D * 0.92);
+        const consoleMesh = new THREE.Mesh(consoleGeo, djConsoleMat);
+        consoleMesh.rotation.x = -Math.PI / 2;
+        consoleMesh.position.set(0, deskH + 0.02, 0);
+        elGroup.add(consoleMesh);
+
+        // Dual studio monitor speakers on rear corners
+        [-width3D * 0.42, width3D * 0.42].forEach((sx) => {
+          const spkGeo = new THREE.BoxGeometry(0.6, 0.9, 0.6);
+          const spkMesh = new THREE.Mesh(spkGeo, metalLegMat);
+          spkMesh.position.set(sx, deskH + 0.55, -depth3D * 0.35);
+          elGroup.add(spkMesh);
+        });
+      } else if (subtype === 'fixture-buffet') {
+        const tableH = 2.6;
+        const tableGeo = new THREE.BoxGeometry(width3D, tableH, depth3D);
+        const tableMesh = new THREE.Mesh(tableGeo, whiteLinenMat);
+        tableMesh.position.y = tableH / 2;
+        tableMesh.castShadow = true;
+        elGroup.add(tableMesh);
+        interactiveMap.set(tableMesh, el);
+
+        // Stainless steel chafing dishes
+        const numDishes = Math.max(2, Math.floor(width3D / 1.8));
+        const spacing = width3D / (numDishes + 1);
+        for (let i = 1; i <= numDishes; i++) {
+          const cx = -width3D / 2 + i * spacing;
+          // Warming pan base
+          const panGeo = new THREE.BoxGeometry(1.2, 0.25, depth3D * 0.55);
+          const panMesh = new THREE.Mesh(panGeo, stainlessSteelMat);
+          panMesh.position.set(cx, tableH + 0.14, 0);
+          elGroup.add(panMesh);
+
+          // Domed roll-top lid
+          const lidGeo = new THREE.CylinderGeometry(depth3D * 0.25, depth3D * 0.25, 1.15, 16, 1, false, 0, Math.PI);
+          const lidMesh = new THREE.Mesh(lidGeo, stainlessSteelMat);
+          lidMesh.rotation.z = Math.PI / 2;
+          lidMesh.position.set(cx, tableH + 0.38, 0);
+          elGroup.add(lidMesh);
+        }
+
+        // Overhead sneeze guard
+        const guardGeo = new THREE.BoxGeometry(width3D * 0.95, 0.04, depth3D * 0.5);
+        const guardMesh = new THREE.Mesh(guardGeo, glassPartitionMat);
+        guardMesh.position.set(0, tableH + 1.2, 0);
+        elGroup.add(guardMesh);
+      } else if (subtype === 'fixture-kitchen') {
+        const passH = 3.2;
+        const counterGeo = new THREE.BoxGeometry(width3D, passH, depth3D);
+        const counterMesh = new THREE.Mesh(counterGeo, stainlessSteelMat);
+        counterMesh.position.y = passH / 2;
+        counterMesh.castShadow = true;
+        elGroup.add(counterMesh);
+        interactiveMap.set(counterMesh, el);
+
+        // Overhead stainless gantry rack with heat lamps
+        const rackGeo = new THREE.BoxGeometry(width3D, 0.12, depth3D * 0.6);
+        const rackMesh = new THREE.Mesh(rackGeo, stainlessSteelMat);
+        rackMesh.position.set(0, passH + 1.6, 0);
+        elGroup.add(rackMesh);
+
+        // Glowing heat lamps
+        [-width3D * 0.3, 0, width3D * 0.3].forEach((lx) => {
+          const lampGeo = new THREE.CylinderGeometry(0.18, 0.25, 0.3, 12);
+          const lampMesh = new THREE.Mesh(lampGeo, heatLampMat);
+          lampMesh.position.set(lx, passH + 1.35, 0);
+          elGroup.add(lampMesh);
+        });
+      } else if (subtype === 'fixture-bar' || el.shape === 'bar') {
+        const barH = 3.6;
+        const counterGeo = new THREE.BoxGeometry(width3D, 0.18, depth3D);
+        const counterMesh = new THREE.Mesh(counterGeo, barCounterMat);
+        counterMesh.position.y = barH;
+        counterMesh.castShadow = true;
+        elGroup.add(counterMesh);
+        interactiveMap.set(counterMesh, el);
+
+        const panelGeo = new THREE.BoxGeometry(width3D * 0.98, barH, depth3D * 0.86);
+        const panelMesh = new THREE.Mesh(panelGeo, stageWoodMat);
+        panelMesh.position.y = barH / 2;
+        panelMesh.castShadow = true;
+        elGroup.add(panelMesh);
+
+        // Brass footrail
+        const railGeo = new THREE.CylinderGeometry(0.05, 0.05, width3D * 0.98, 12);
+        const railMesh = new THREE.Mesh(railGeo, goldMetallicMat);
+        railMesh.rotation.z = Math.PI / 2;
+        railMesh.position.set(0, 0.6, depth3D * 0.48);
+        elGroup.add(railMesh);
+
+        // Bar stools if covers > 0
+        if (el.covers > 0) {
+          const stoolSpacing = width3D / (el.covers + 1);
+          for (let s = 1; s <= el.covers; s++) {
+            const sx = -width3D / 2 + s * stoolSpacing;
+            const stoolGroup = new THREE.Group();
+            stoolGroup.position.set(sx, 0, depth3D * 0.65);
+            elGroup.add(stoolGroup);
+
+            // Stool cushion
+            const stoolSeat = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.42, 0.42, 0.12, 20),
+              chairCushionMat
+            );
+            stoolSeat.position.y = 2.45;
+            stoolGroup.add(stoolSeat);
+
+            // Stool metal pedestal stem & base
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.4, 10), metalLegMat);
+            stem.position.y = 1.2;
+            stoolGroup.add(stem);
+
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.38, 0.05, 20), metalLegMat);
+            base.position.y = 0.025;
+            stoolGroup.add(base);
+          }
+        }
+      } else if (subtype === 'fixture-stage' || el.name.toLowerCase().includes('stage')) {
         const stageH = 1.8;
         const stageGeo = new THREE.BoxGeometry(width3D, stageH, depth3D);
         const stageMesh = new THREE.Mesh(stageGeo, stageWoodMat);
@@ -2315,38 +3088,106 @@ function createFurnitureMeshes(
         elGroup.add(stageMesh);
         interactiveMap.set(stageMesh, el);
 
-        // Front stage velvet drape
+        // Front velvet drape
         const skirtGeo = new THREE.BoxGeometry(width3D, stageH, 0.08);
         const skirtMesh = new THREE.Mesh(skirtGeo, stageVelvetMat);
         skirtMesh.position.set(0, stageH / 2, depth3D / 2 + 0.04);
-        skirtMesh.castShadow = true;
         elGroup.add(skirtMesh);
-      } else if (
-        el.subtype?.includes('pillar') ||
-        el.name.toLowerCase().includes('pillar') ||
-        el.name.toLowerCase().includes('column')
-      ) {
-        // Architectural Pillar
-        const pillarRadius = width3D / 2;
-        const pillarH = 12;
-        const pillarGeo = new THREE.CylinderGeometry(pillarRadius, pillarRadius, pillarH, 32);
-        const pillarMesh = new THREE.Mesh(pillarGeo, barCounterMat);
-        pillarMesh.position.y = pillarH / 2;
-        pillarMesh.castShadow = true;
-        elGroup.add(pillarMesh);
-        interactiveMap.set(pillarMesh, el);
-      } else {
-        // Generic architectural partition
-        const h = 2.4;
-        const box = new THREE.Mesh(new THREE.BoxGeometry(width3D, h, depth3D), stageWoodMat);
-        box.position.y = h / 2;
-        box.castShadow = true;
-        elGroup.add(box);
-        interactiveMap.set(box, el);
-      }
-    } else if (el.type === 'decor') {
-      if (el.subtype?.includes('plant') || el.name.toLowerCase().includes('plant')) {
-        // Potted Palm / Ficus plant
+
+        // Center mic stand
+        const micBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.04, 16), metalLegMat);
+        micBase.position.set(0, stageH + 0.02, 0);
+        elGroup.add(micBase);
+
+        const micPole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 3.8, 8), metalLegMat);
+        micPole.position.set(0, stageH + 1.9, 0);
+        elGroup.add(micPole);
+      } else if (subtype === 'fixture-dance-floor') {
+        const h = 0.2;
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(width3D, h, depth3D), danceFloorMat);
+        mesh.position.y = h / 2;
+        mesh.receiveShadow = true;
+        elGroup.add(mesh);
+        interactiveMap.set(mesh, el);
+
+        const rampGeo = new THREE.BoxGeometry(width3D + 0.4, 0.1, depth3D + 0.4);
+        const rampMesh = new THREE.Mesh(rampGeo, goldMetallicMat);
+        rampMesh.position.y = 0.05;
+        rampMesh.receiveShadow = true;
+        elGroup.add(rampMesh);
+      } else if (subtype === 'deck-wood') {
+        const deckH = 0.25;
+        const deckGeo = new THREE.BoxGeometry(width3D, deckH, depth3D);
+        const deckMesh = new THREE.Mesh(deckGeo, woodPlankDeckMat);
+        deckMesh.position.y = deckH / 2;
+        deckMesh.receiveShadow = true;
+        elGroup.add(deckMesh);
+        interactiveMap.set(deckMesh, el);
+
+        // Perimeter framing rim
+        const rimGeo = new THREE.BoxGeometry(width3D + 0.2, 0.28, depth3D + 0.2);
+        const rimMesh = new THREE.Mesh(rimGeo, halfWallCapMat);
+        rimMesh.position.y = deckH / 2;
+        elGroup.add(rimMesh);
+      } else if (subtype === 'deck-stone') {
+        const deckH = 0.2;
+        const deckGeo = new THREE.BoxGeometry(width3D, deckH, depth3D);
+        const deckMesh = new THREE.Mesh(deckGeo, stoneDeckMat);
+        deckMesh.position.y = deckH / 2;
+        deckMesh.receiveShadow = true;
+        elGroup.add(deckMesh);
+        interactiveMap.set(deckMesh, el);
+      } else if (subtype === 'outdoor-umbrella') {
+        // Heavy base
+        const base = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.85, 0.1, 24), metalLegMat);
+        base.position.y = 0.05;
+        elGroup.add(base);
+        interactiveMap.set(base, el);
+
+        // Mast pole
+        const mastH = 8.6;
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, mastH, 12), metalLegMat);
+        mast.position.y = mastH / 2;
+        elGroup.add(mast);
+
+        // Fabric canopy cone
+        const canopyR = Math.min(width3D, depth3D) * 0.48;
+        const canopy = new THREE.Mesh(new THREE.ConeGeometry(canopyR, 1.6, 8), umbrellaFabricMat);
+        canopy.position.y = mastH - 0.5;
+        elGroup.add(canopy);
+      } else if (subtype === 'outdoor-pergola') {
+        const postH = 8.5;
+        const postW = 0.35;
+        // 4 corner timber posts
+        [
+          [-width3D / 2 + postW, -depth3D / 2 + postW],
+          [width3D / 2 - postW, -depth3D / 2 + postW],
+          [width3D / 2 - postW, depth3D / 2 - postW],
+          [-width3D / 2 + postW, depth3D / 2 - postW]
+        ].forEach(([px, pz]) => {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(postW, postH, postW), pergolaTimberMat);
+          post.position.set(px, postH / 2, pz);
+          elGroup.add(post);
+        });
+
+        // Top beams & cross rafters
+        const beamGeo = new THREE.BoxGeometry(width3D, 0.3, 0.2);
+        const b1 = new THREE.Mesh(beamGeo, pergolaTimberMat);
+        b1.position.set(0, postH - 0.15, -depth3D / 2 + postW);
+        elGroup.add(b1);
+
+        const b2 = new THREE.Mesh(beamGeo, pergolaTimberMat);
+        b2.position.set(0, postH - 0.15, depth3D / 2 - postW);
+        elGroup.add(b2);
+
+        // Transverse slatted rafters
+        for (let rx = -width3D / 2 + 1; rx <= width3D / 2 - 1; rx += 1.4) {
+          const rafter = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.25, depth3D), pergolaTimberMat);
+          rafter.position.set(rx, postH + 0.12, 0);
+          elGroup.add(rafter);
+        }
+        interactiveMap.set(b1, el);
+      } else if (subtype === 'plant-potted' || subtype === 'plant-palm' || subtype === 'plant-box') {
         const potRadius = Math.min(width3D, depth3D) * 0.45;
         const potH = 1.8;
         const potGeo = new THREE.CylinderGeometry(potRadius, potRadius * 0.72, potH, 20);
@@ -2356,36 +3197,57 @@ function createFurnitureMeshes(
         elGroup.add(potMesh);
         interactiveMap.set(potMesh, el);
 
-        // Lush foliage sphere cluster
         for (let i = 0; i < 3; i++) {
           const leafGeo = new THREE.SphereGeometry(potRadius * 1.2, 16, 14);
           const leafMesh = new THREE.Mesh(leafGeo, plantFoliageMat);
-          leafMesh.position.set((i - 1) * 0.3, potH + potRadius * (1 + i * 0.3), (i % 2 === 0 ? 0.2 : -0.2));
+          leafMesh.position.set((i - 1) * 0.3, potH + potRadius * (1 + i * 0.3), i % 2 === 0 ? 0.2 : -0.2);
           leafMesh.castShadow = true;
           elGroup.add(leafMesh);
         }
-      } else {
-        // High-gloss checkered dance floor with beveled gold ramp
-        const h = 0.2;
-        const mesh = new THREE.Mesh(new THREE.BoxGeometry(width3D, h, depth3D), danceFloorMat);
-        mesh.position.y = h / 2;
-        mesh.receiveShadow = true;
-        elGroup.add(mesh);
-        interactiveMap.set(mesh, el);
+      } else if (subtype === 'plant-green-wall') {
+        const wallH = 7.5;
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(width3D, wallH, depth3D), plantFoliageMat);
+        wall.position.y = wallH / 2;
+        elGroup.add(wall);
+        interactiveMap.set(wall, el);
+      } else if (subtype === 'decor-photo-backdrop') {
+        const archH = 8.0;
+        const archGeo = new THREE.BoxGeometry(width3D, archH, 0.2);
+        const archMesh = new THREE.Mesh(archGeo, stageWoodMat);
+        archMesh.position.y = archH / 2;
+        elGroup.add(archMesh);
+        interactiveMap.set(archMesh, el);
 
-        // Gold safety ramp border
-        const rampGeo = new THREE.BoxGeometry(width3D + 0.4, 0.1, depth3D + 0.4);
-        const rampMesh = new THREE.Mesh(rampGeo, goldMetallicMat);
-        rampMesh.position.y = 0.05;
-        rampMesh.receiveShadow = true;
-        elGroup.add(rampMesh);
+        // Floral garland clusters
+        for (let f = 0; f < 8; f++) {
+          const flower = new THREE.Mesh(
+            new THREE.SphereGeometry(0.35, 12, 10),
+            f % 2 === 0 ? floralBlossomMat : floralCreamMat
+          );
+          const fx = -width3D / 2 + (f / 7) * width3D;
+          const fy = archH - Math.sin((f / 7) * Math.PI) * 1.5;
+          flower.position.set(fx, fy, 0.18);
+          elGroup.add(flower);
+        }
+      } else {
+        // Default clean architectural fixture / partition (NEVER generic pitch black!)
+        const h = 2.4;
+        const box = new THREE.Mesh(new THREE.BoxGeometry(width3D, h, depth3D), drywallMat);
+        box.position.y = h / 2;
+        box.castShadow = true;
+        elGroup.add(box);
+        interactiveMap.set(box, el);
+
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(width3D + 0.05, 0.25, depth3D + 0.05), metalLegMat);
+        trim.position.y = 0.125;
+        elGroup.add(trim);
       }
     }
   });
 }
 
 /**
- * Creates floating 3D Table Badges with table names, covers, and VIP styling.
+ * Creates floating 3D Scene Badges for tables, restrooms, exits, and venue fixtures.
  */
 function createTableLabels(
   group: THREE.Group,
@@ -2398,41 +3260,132 @@ function createTableLabels(
   }
 
   elements.forEach((el) => {
-    if (el.type !== 'table') return;
-
+    const subtype = getElementSubtype(el);
     const posX = (el.x + el.width / 2) * scale;
     const posZ = (el.y + el.height / 2) * scale;
 
     const canvas = document.createElement('canvas');
-    canvas.width = 300;
+    canvas.width = 320;
     canvas.height = 150;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    let title = '';
+    let subtitle = '';
+    let bgColor = 'rgba(15, 23, 42, 0.94)';
+    let borderColor = '#6366f1';
+    let labelElevation = 4.5;
+    let spriteScale = { x: 3.4, y: 1.6 };
+
+    if (el.type === 'table' && subtype !== 'fixture-bar') {
+      title = el.name || 'Table';
+      const statusTxt = el.status === 'vip' ? '★ VIP • ' : el.status === 'reserved' ? 'Reserved • ' : '';
+      subtitle = `${statusTxt}${el.covers} Seats`;
+      borderColor = el.status === 'vip' ? '#f59e0b' : el.status === 'reserved' ? '#ec4899' : '#6366f1';
+      labelElevation = 4.5;
+    } else if (subtype === 'fixture-restrooms') {
+      bgColor = 'rgba(2, 132, 199, 0.96)'; // Rich commercial restroom cyan
+      borderColor = '#38bdf8';
+      title = '🚻 ♿ RESTROOMS';
+      subtitle = 'Guest Facilities • Accessible';
+      labelElevation = 8.6;
+      spriteScale = { x: 3.8, y: 1.8 };
+    } else if (subtype === 'door-emergency') {
+      bgColor = 'rgba(21, 128, 61, 0.96)'; // Emergency exit green
+      borderColor = '#4ade80';
+      title = '🚨 EXIT ➔';
+      subtitle = 'Emergency Egress Only';
+      labelElevation = 8.6;
+      spriteScale = { x: 3.6, y: 1.7 };
+    } else if (subtype === 'fixture-host') {
+      bgColor = 'rgba(30, 41, 59, 0.95)';
+      borderColor = '#cbd5e1';
+      title = '🎩 HOST STAND';
+      subtitle = 'Reception & Welcome';
+      labelElevation = 5.6;
+    } else if (subtype === 'fixture-dj') {
+      bgColor = 'rgba(30, 27, 75, 0.96)';
+      borderColor = '#818cf8';
+      title = '🎧 DJ BOOTH';
+      subtitle = 'Audio & Lighting Console';
+      labelElevation = 5.6;
+    } else if (subtype === 'fixture-kitchen') {
+      bgColor = 'rgba(124, 45, 18, 0.96)';
+      borderColor = '#fb923c';
+      title = '🍳 KITCHEN PASS';
+      subtitle = 'Order Expeditor Window';
+      labelElevation = 5.6;
+    } else if (subtype === 'fixture-buffet') {
+      bgColor = 'rgba(51, 65, 85, 0.95)';
+      borderColor = '#94a3b8';
+      title = '🍽️ BUFFET STATION';
+      subtitle = 'Self-Service Catering';
+      labelElevation = 5.2;
+    } else if (subtype === 'fixture-bar' || el.shape === 'bar') {
+      bgColor = 'rgba(15, 23, 42, 0.96)';
+      borderColor = '#d97706';
+      title = `🍸 ${el.name || 'BAR'}`;
+      subtitle = el.covers > 0 ? `${el.covers} Bar Stools` : 'Cocktail & Beverage Service';
+      labelElevation = 5.8;
+    } else if (subtype === 'fixture-stage' || el.name.toLowerCase().includes('stage')) {
+      bgColor = 'rgba(15, 23, 42, 0.96)';
+      borderColor = '#f59e0b';
+      title = `🎤 ${el.name || 'EVENT STAGE'}`;
+      subtitle = 'Presentation & Performance';
+      labelElevation = 4.2;
+    } else if (subtype === 'fixture-dance-floor') {
+      bgColor = 'rgba(120, 53, 15, 0.96)';
+      borderColor = '#fbbf24';
+      title = `✨ ${el.name || 'DANCE FLOOR'}`;
+      subtitle = 'Parquet Dance Space';
+      labelElevation = 3.5;
+    } else if (subtype === 'decor-photo-backdrop') {
+      bgColor = 'rgba(131, 24, 67, 0.96)';
+      borderColor = '#f472b6';
+      title = '🌸 PHOTO BACKDROP';
+      subtitle = 'Floral Arch & Photo-Op';
+      labelElevation = 6.2;
+    } else if (subtype === 'outdoor-pergola') {
+      bgColor = 'rgba(120, 53, 15, 0.95)';
+      borderColor = '#d97706';
+      title = el.name || 'Pergola Canopy';
+      subtitle = 'Outdoor Shaded Space';
+      labelElevation = 9.8;
+    } else if (subtype === 'deck-wood' || subtype === 'deck-stone') {
+      bgColor = 'rgba(30, 41, 59, 0.95)';
+      borderColor = '#94a3b8';
+      title = el.name || 'Outdoor Terrace';
+      subtitle = 'Alfresco Dining Deck';
+      labelElevation = 3.2;
+    } else {
+      if (!el.name || el.name === 'Pillar' || el.name === 'Wall') return;
+      title = el.name;
+      subtitle = 'Venue Element';
+      labelElevation = 4.2;
+    }
+
     // Badge Background
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-    ctx.roundRect(12, 16, 276, 118, 24);
+    ctx.fillStyle = bgColor;
+    ctx.roundRect(12, 16, 296, 118, 24);
     ctx.fill();
 
     // Border
-    ctx.strokeStyle =
-      el.status === 'vip' ? '#f59e0b' : el.status === 'reserved' ? '#ec4899' : '#6366f1';
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 7;
-    ctx.roundRect(12, 16, 276, 118, 24);
+    ctx.roundRect(12, 16, 296, 118, 24);
     ctx.stroke();
 
-    // Table Name
+    // Title
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 42px Plus Jakarta Sans, sans-serif';
+    ctx.font = 'bold 34px Plus Jakarta Sans, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(el.name || 'Table', 150, 58);
+    ctx.fillText(title, 160, 56);
 
-    // Cover info
-    ctx.fillStyle = el.status === 'vip' ? '#fcd34d' : '#94a3b8';
-    ctx.font = 'bold 26px Plus Jakarta Sans, sans-serif';
-    const statusTxt = el.status === 'vip' ? '★ VIP • ' : el.status === 'reserved' ? 'Reserved • ' : '';
-    ctx.fillText(`${statusTxt}${el.covers} Seats`, 150, 102);
+    // Subtitle
+    ctx.fillStyle = el.status === 'vip' ? '#fcd34d' : '#e0f2fe';
+    ctx.font = 'bold 22px Plus Jakarta Sans, sans-serif';
+    ctx.fillText(subtitle, 160, 102);
 
     const texture = new THREE.CanvasTexture(canvas);
     const spriteMat = new THREE.SpriteMaterial({
@@ -2441,8 +3394,8 @@ function createTableLabels(
       depthTest: false
     });
     const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(3.4, 1.7, 1);
-    sprite.position.set(posX, 4.5, posZ);
+    sprite.scale.set(spriteScale.x, spriteScale.y, 1);
+    sprite.position.set(posX, labelElevation, posZ);
 
     group.add(sprite);
   });

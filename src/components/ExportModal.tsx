@@ -316,26 +316,49 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <span>Include Capacity & Covers Metric Bar</span>
               </label>
 
-              <div className="grid grid-cols-2 gap-2 pt-1 text-xs text-slate-600">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="grid grid-cols-3 gap-2 pt-1 text-xs text-slate-600">
+                <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={includeTitleBlock}
                     onChange={(e) => setIncludeTitleBlock(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-indigo-600"
+                    className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span>CAD Title Block</span>
+                  <span className="truncate">CAD Title Block</span>
                 </label>
 
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={includeCompass}
                     onChange={(e) => setIncludeCompass(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-indigo-600"
+                    className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span>North Compass Rose</span>
+                  <span className="truncate">Compass Rose</span>
                 </label>
+
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeLegend}
+                    onChange={(e) => setIncludeLegend(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="truncate">Legend Key</span>
+                </label>
+              </div>
+
+              {/* Floordone Official Signature Branding Guarantee */}
+              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-1.5 font-semibold text-slate-800">
+                  <div className="w-4 h-4 rounded-md bg-slate-900 flex items-center justify-center text-[9px] font-bold text-indigo-400">
+                    FD
+                  </div>
+                  <span>Floordone Studio Signature Footer</span>
+                </div>
+                <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                  Included at bottom of all sheets
+                </span>
               </div>
             </div>
           </div>
