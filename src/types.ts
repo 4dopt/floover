@@ -65,6 +65,7 @@ export interface Collaborator {
   name: string;
   color: string;
   avatar: string;
+  role?: 'owner' | 'editor' | 'commenter' | 'viewer';
   cursor?: { x: number; y: number };
   selectedElementId?: string | null;
   lastActive?: number;
@@ -131,4 +132,4 @@ export interface MarketingQuestionnaireData {
   submittedAt: string;
 }
 
-export type PricingPlanId = 'free' | 'solo' | 'pro' | 'lifetime';
+export type PricingPlanId = 'free' | 'planner' | 'venue' | 'enterprise' | 'solo' | 'pro' | 'lifetime';

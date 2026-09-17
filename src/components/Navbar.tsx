@@ -317,14 +317,25 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </button>
 
+        {/* Figma-Style Share Button */}
+        <button
+          id="btn-share-link"
+          onClick={onOpenCollaboration}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold shadow-xs transition cursor-pointer"
+          title="Share Figma-style live collaboration link"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          <span>Share</span>
+        </button>
+
         {/* Export PDF */}
         <button
           id="btn-export-pdf"
           onClick={onOpenExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold shadow-xs transition"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 active:bg-slate-950 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
         >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export PDF</span>
+          <Download className="w-3.5 h-3.5 text-slate-300" />
+          <span>Export</span>
         </button>
       </div>
     </header>

@@ -12,24 +12,35 @@ import {
   Compass,
   FileSpreadsheet,
   Layers,
-  Award
+  Award,
+  Lock
 } from 'lucide-react';
 import { FloorPlan } from '../types';
 import { exportFloorPlanToPdf, exportFloorPlanToPng } from '../utils/pdfExport';
+import { PlanTierId } from '../types/entitlements';
+import { canAccessFeature, getStoredPlanTier } from '../utils/entitlements';
+import { PaywallModal } from './PaywallModal';
 
 interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   floorPlan: FloorPlan;
+  currentPlan?: PlanTierId;
+  onUpgradePlan?: (tier: PlanTierId) => void;
+  onOpenPricing?: () => void;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
-  floorPlan
+  floorPlan,
+  currentPlan = getStoredPlanTier(),
+  onUpgradePlan,
+  onOpenPricing
 }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportType, setExportType] = useState<'pdf' | 'png' | 'json'>('pdf');
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [dpiQuality, setDpiQuality] = useState<'standard' | 'high' | 'ultra'>('high');
   const [paperSize, setPaperSize] = useState<'a4' | 'letter'>('a4');
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
@@ -43,6 +54,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   if (!isOpen) return null;
 
   const handleExport = async () => {
+    if (exportType === 'pdf' && !canAccessFeature(currentPlan, 'HIGH_RES_PDF_EXPORT').allowed) {
+      setIsPaywallOpen(true);
+      return;
+    }
+
     setIsExporting(true);
     setStatusMessage('Preparing vector floor plan geometry...');
 
@@ -133,13 +149,24 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <div className="grid grid-cols-3 gap-2">
             <button
               id="export-opt-pdf"
-              onClick={() => setExportType('pdf')}
-              className={`p-3 rounded-2xl border flex flex-col items-center text-center gap-1.5 transition ${
+              onClick={() => {
+                if (!canAccessFeature(currentPlan, 'HIGH_RES_PDF_EXPORT').allowed) {
+                  setIsPaywallOpen(true);
+                  return;
+                }
+                setExportType('pdf');
+              }}
+              className={`p-3 rounded-2xl border flex flex-col items-center text-center gap-1.5 transition relative ${
                 exportType === 'pdf'
                   ? 'bg-indigo-50/80 border-indigo-500 text-indigo-950 font-bold ring-2 ring-indigo-500/20 shadow-xs'
                   : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
               }`}
             >
+              {!canAccessFeature(currentPlan, 'HIGH_RES_PDF_EXPORT').allowed && (
+                <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[9px] font-black flex items-center gap-0.5 border border-amber-300">
+                  <Lock className="w-2.5 h-2.5" /> PRO
+                </span>
+              )}
               <FileText className="w-5 h-5 text-indigo-600" />
               <span className="text-xs">Printable PDF</span>
               <span className="text-[10px] text-slate-400 font-normal">CAD Blueprint</span>
@@ -402,6 +429,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Paywall Modal for PDF Export */}
+      <PaywallModal
+        isOpen={isPaywallOpen}
+        onClose={() => setIsPaywallOpen(false)}
+        featureKey="HIGH_RES_PDF_EXPORT"
+        currentPlan={currentPlan}
+        onUpgradeSuccess={(newPlan) => {
+          if (onUpgradePlan) onUpgradePlan(newPlan);
+          setIsPaywallOpen(false);
+        }}
+        onOpenFullPricing={onOpenPricing}
+      />
     </div>
   );
 };

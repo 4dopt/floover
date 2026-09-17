@@ -31,7 +31,7 @@ import {
   activatePaidPlanLocally
 } from '../utils/lemonSqueezy';
 
-export type PlanId = 'free' | 'solo' | 'pro' | 'lifetime';
+export type PlanId = 'free' | 'planner' | 'venue' | 'enterprise' | 'solo' | 'pro' | 'lifetime';
 
 export interface PlanConfig {
   id: PlanId;
@@ -42,6 +42,8 @@ export interface PlanConfig {
   monthlyPrice: number;
   annualMonthlyPrice: number;
   oneTimePrice?: number;
+  includedSeats?: number;
+  extraSeatPrice?: number;
   highlighted?: boolean;
   features: string[];
   omittedFeatures?: string[];
@@ -53,100 +55,106 @@ export interface PlanConfig {
 const PRICING_PLANS: PlanConfig[] = [
   {
     id: 'free',
-    name: 'Starter Free',
-    tagline: 'Essential floor planning tools for small venues and one-off sketches.',
+    name: 'Free Starter',
+    tagline: 'Essential 2D floor planning for individuals and one-off venue sketches.',
     monthlyPrice: 0,
     annualMonthlyPrice: 0,
+    includedSeats: 0,
     features: [
       '1 active floor plan project',
-      'Up to 30 tables & architectural elements',
-      'Standard 2D Canvas with chair snap',
-      'Individual table corner & end chair toggling',
-      'Basic furniture & table presets',
-      'Export floor plan as standard PNG/SVG',
+      'Basic 2D CAD drafting & element placement',
+      'Real-time 3D orbit preview with watermark',
+      'Standard PNG / SVG canvas exports',
+      'Public view-only sharing links',
       'Local in-browser auto-save'
     ],
     omittedFeatures: [
-      'Unlimited floor plans & multi-room venues',
-      'High-resolution vector PDF export with seating manifests',
-      'Full architectural library (Walls, double doors, decks, plants)',
-      'Live team multiplayer collaboration with cursors',
-      'Custom venue branding & logo on PDF sheets'
+      'Unlimited active floor plans',
+      'Multiplayer live editing with clients (real-time cursors)',
+      'Full unbranded 3D orbit & first-person walkthrough',
+      'Dynamic seating capacity & table spacing calculators',
+      'Venue master templates & 3D embed code'
     ],
     ctaText: 'Use Free Forever',
     accentColor: 'slate',
     icon: <Tag className="w-5 h-5 text-slate-600" />
   },
   {
-    id: 'solo',
-    name: 'Solo Host',
-    tagline: 'Ideal for independent cafes, bistros, pop-up events, and private dining.',
-    badge: '⚡ CHEAPEST PRO TIER',
-    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-    monthlyPrice: 1.99,
-    annualMonthlyPrice: 1.19, // ~$14.28/year
-    features: [
-      'Unlimited floor plans & venue projects',
-      'Unlimited tables, chairs, and elements per room',
-      'Complete architectural library (hatched walls, sliding doors, windows)',
-      'Outdoor patio decks, stone terraces & parasols',
-      'Botanical greenery & living moss walls',
-      'High-Resolution PDF export with guest names & seating manifests',
-      'Custom room dimensions (feet & meters)',
-      'Automatic cloud backup & cross-device sync',
-      'Standard email support'
-    ],
-    omittedFeatures: [
-      'Live team multiplayer collaboration with cursors',
-      'Custom venue branding & logo on PDF sheets'
-    ],
-    ctaText: 'Get Solo Host',
-    accentColor: 'emerald',
-    icon: <Coffee className="w-5 h-5 text-emerald-600" />
-  },
-  {
-    id: 'pro',
-    name: 'Pro Studio',
-    tagline: 'Full power for thriving restaurants, wedding venues, and event coordinators.',
-    badge: '🔥 MOST POPULAR',
+    id: 'planner',
+    name: 'Planner / Pro',
+    tagline: 'High-speed professional planning for event coordinators and designers.',
+    badge: '⚡ MOST POPULAR',
     badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-300',
-    monthlyPrice: 3.99,
-    annualMonthlyPrice: 2.49, // ~$29.88/year
+    monthlyPrice: 29,
+    annualMonthlyPrice: 24, // ~$288/year
+    includedSeats: 1,
     highlighted: true,
     features: [
-      'Everything in Solo Host, PLUS:',
-      'Live multiplayer team collaboration with real-time cursor presence',
-      'Instant shareable floor plan review links',
-      'Custom venue branding (upload your logo to PDF manifests)',
-      'Full room templates library (Fine Dining, Banquet, Rooftop Lounge)',
-      'Turnover & covers revenue ROI modeler',
-      'Table assignment status tracking (Available, Reserved, Occupied, VIP)',
-      'Priority 60 FPS hardware-accelerated canvas',
-      'Unlimited revision history with 1-click Undo/Redo'
+      'Unlimited active floor plan projects',
+      '1 included team editor seat',
+      'Live multiplayer editing with clients (real-time cursors)',
+      'Full unbranded 3D orbit & first-person walkthrough',
+      'Dynamic seating capacity & table spacing calculators',
+      'High-resolution vector PDF exports with seating manifests',
+      'Table assignment tracking & guest notes'
     ],
-    ctaText: 'Upgrade to Pro',
+    omittedFeatures: [
+      'Reusable venue master templates',
+      'Guest eye-level sightline tool in 3D',
+      'Daylight vs. Evening Banquet lighting toggles',
+      'Embeddable 3D iframe for venue websites'
+    ],
+    ctaText: 'Upgrade to Planner ($29/mo)',
     accentColor: 'indigo',
     icon: <Crown className="w-5 h-5 text-indigo-600" />
   },
   {
-    id: 'lifetime',
-    name: 'Lifetime Founder',
-    tagline: 'Pay once, own Floordone forever. Zero recurring subscriptions, zero surprises.',
-    badge: '⭐ BEST COMMUNITY DEAL',
-    badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
-    monthlyPrice: 9.99, // shown as one time
-    annualMonthlyPrice: 9.99,
-    oneTimePrice: 9.99,
+    id: 'venue',
+    name: 'Venue / Studio',
+    tagline: 'Turnkey sales & operations platform for wedding halls, hotels, and venues.',
+    badge: '🏆 VENUE CHOICE',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    monthlyPrice: 79,
+    annualMonthlyPrice: 65, // ~$780/year
+    includedSeats: 3,
+    extraSeatPrice: 15,
     features: [
-      'All Pro Studio features unlocked forever',
-      'Single one-time payment of $9.99 (No monthly or annual bills)',
-      'All future architectural presets and tool updates included',
-      'Permanent VIP Founder badge on export documents',
-      'Unlimited floor plans & team collaboration links',
-      '100% money-back guarantee for 30 days',
-      'Direct email access to the engineering team'
+      'Everything in Planner / Pro, PLUS:',
+      '3 included editor seats (extra seats at $15/mo)',
+      'Reusable venue master templates (lock structural walls)',
+      'Multi-room & multi-floor event layout support',
+      'Guest eye-level sightline tool in 3D (test views to stage)',
+      'Lighting environment toggles (Daylight vs. Evening Banquet)',
+      'Embeddable 3D interactive iframe for your website'
     ],
-    ctaText: 'Get Lifetime Pass',
+    omittedFeatures: [
+      'Custom 3D inventory & proprietary asset uploading',
+      'Client portal white-label branding'
+    ],
+    ctaText: 'Upgrade to Venue ($79/mo)',
+    accentColor: 'emerald',
+    icon: <Coffee className="w-5 h-5 text-emerald-600" />
+  },
+  {
+    id: 'enterprise',
+    name: 'Business / Enterprise',
+    tagline: 'Turnkey multi-venue hospitality groups, custom 3D inventory, and client white-labeling.',
+    badge: '👑 ENTERPRISE',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
+    monthlyPrice: 199,
+    annualMonthlyPrice: 169, // ~$2,028/year
+    includedSeats: 10,
+    extraSeatPrice: 15,
+    features: [
+      'Everything in Venue / Studio, PLUS:',
+      '10 included editor seats (extra seats at $15/mo)',
+      'Custom 3D inventory & asset catalog uploading',
+      'Client portal branding (custom domain & white-label logo)',
+      'Granular team permissions & enterprise audit logs',
+      'Priority hardware-accelerated cloud rendering & SLA',
+      'Dedicated account manager & staff onboarding'
+    ],
+    ctaText: 'Contact Sales ($199/mo)',
     accentColor: 'amber',
     icon: <Flame className="w-5 h-5 text-amber-600" />
   }
@@ -205,20 +213,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({
       return;
     }
 
-    if (plan.id === 'free') {
-      setActivePlan('free');
-      localStorage.setItem('floordone_user_plan', 'free');
-      localStorage.setItem('floover_user_plan', 'free');
-      if (onSelectPlan) {
-        onSelectPlan('free');
-      }
-      setShowSuccessToast(`Your plan has been updated to Free Starter.`);
-      setTimeout(() => setShowSuccessToast(null), 3500);
-      return;
+    setActivePlan(plan.id);
+    localStorage.setItem('floordone_plan_tier', plan.id);
+    localStorage.setItem('floordone_user_plan', plan.id);
+    window.dispatchEvent(new CustomEvent('floordone:tier-changed', { detail: { tier: plan.id } }));
+    if (onSelectPlan) {
+      onSelectPlan(plan.id);
     }
-
-    // For any paid plan (solo, pro, lifetime): open Lemon Squeezy checkout link
-    openLemonSqueezyCheckout(LEMON_SQUEEZY_CHECKOUT_URL);
+    setShowSuccessToast(`Plan switched to ${plan.name}! Features unlocked.`);
+    setTimeout(() => setShowSuccessToast(null), 3500);
   };
 
   return (

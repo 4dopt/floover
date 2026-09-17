@@ -27,7 +27,11 @@ import {
   Box,
   Shapes,
   Eye,
-  Layers
+  Layers,
+  MessageSquare,
+  Users,
+  Calculator,
+  AlertCircle
 } from 'lucide-react';
 import { FloorElement, FloorPlan, Collaborator, TableStatus, Point2D, RoomShapePreset } from '../types';
 import {
@@ -53,6 +57,11 @@ import {
 import { ArchitecturalElementRenderer, getElementSubtype } from './ArchitecturalElementRenderer';
 import { Canvas3D } from './Canvas3D';
 import { RoomShapeModal } from './RoomShapeModal';
+import { PlanTierId, CollaboratorRole, FeatureKey, PinComment } from '../types/entitlements';
+import { canAccessFeature, canPerformAction, getStoredPlanTier, getStoredCollabRole, setStoredPlanTier } from '../utils/entitlements';
+import { CommentsOverlay } from './CommentsOverlay';
+import { PaywallModal } from './PaywallModal';
+import { CapacityCalculatorModal } from './CapacityCalculatorModal';
 
 interface CanvasProps {
   floorPlan: FloorPlan;
@@ -68,6 +77,10 @@ interface CanvasProps {
   collaborators: Collaborator[];
   onCursorMove: (x: number, y: number) => void;
   onOpenTemplates?: () => void;
+  currentPlan?: PlanTierId;
+  collabRole?: CollaboratorRole;
+  onUpgradePlan?: (tier: PlanTierId) => void;
+  onOpenPricing?: () => void;
 }
 
 export const Canvas: React.FC<CanvasProps> = ({
@@ -83,10 +96,53 @@ export const Canvas: React.FC<CanvasProps> = ({
   snapToGrid,
   collaborators,
   onCursorMove,
-  onOpenTemplates
+  onOpenTemplates,
+  currentPlan: initialCurrentPlan,
+  collabRole: initialCollabRole,
+  onUpgradePlan,
+  onOpenPricing
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Active Plan & Role reactive state
+  const [activePlan, setActivePlan] = useState<PlanTierId>(() => initialCurrentPlan || getStoredPlanTier());
+  const [activeRole, setActiveRole] = useState<CollaboratorRole>(() => initialCollabRole || getStoredCollabRole());
+
+  useEffect(() => {
+    if (initialCurrentPlan) setActivePlan(initialCurrentPlan);
+  }, [initialCurrentPlan]);
+
+  useEffect(() => {
+    if (initialCollabRole) setActiveRole(initialCollabRole);
+  }, [initialCollabRole]);
+
+  useEffect(() => {
+    const handleTierChange = (e: any) => {
+      if (e.detail?.tier) setActivePlan(e.detail.tier);
+    };
+    const handleRoleChange = (e: any) => {
+      if (e.detail?.role) setActiveRole(e.detail.role);
+    };
+    window.addEventListener('floordone:tier-changed', handleTierChange);
+    window.addEventListener('floordone:role-changed', handleRoleChange);
+    return () => {
+      window.removeEventListener('floordone:tier-changed', handleTierChange);
+      window.removeEventListener('floordone:role-changed', handleRoleChange);
+    };
+  }, []);
+
+  // Paywall Modal state
+  const [paywallFeature, setPaywallFeature] = useState<FeatureKey | null>(null);
+  const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
+
+  // Dynamic Seating Capacity & Spacing Calculator Drawer
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // Figma-style Pin Comments State
+  const [comments, setComments] = useState<PinComment[]>([]);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [isPlacingComment, setIsPlacingComment] = useState(false);
 
   // Active tool: 'select' (V) vs 'pan' (H or hold Space)
   const [activeTool, setActiveTool] = useState<'select' | 'pan'>('select');
@@ -709,6 +765,9 @@ export const Canvas: React.FC<CanvasProps> = ({
           onClose3D={() => setIs3DMode(false)}
           onSelectElement={onSelectElement}
           selectedElementId={selectedElementId}
+          currentPlan={activePlan}
+          onUpgradePlan={onUpgradePlan}
+          onOpenPricing={onOpenPricing}
         />
       </div>
     );
@@ -778,6 +837,50 @@ export const Canvas: React.FC<CanvasProps> = ({
         >
           <Box className="w-3.5 h-3.5 text-indigo-200" />
           <span>3D View</span>
+        </button>
+
+        {/* Dynamic Seating Capacity & Table Spacing Calculator */}
+        <button
+          id="btn-capacity-calculator"
+          onClick={() => {
+            if (canAccessFeature(activePlan, 'SEATING_CAPACITY_CALCULATOR').allowed) {
+              setIsCalculatorOpen((prev) => !prev);
+            } else {
+              setPaywallFeature('SEATING_CAPACITY_CALCULATOR');
+            }
+          }}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+            isCalculatorOpen
+              ? 'bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-2xs'
+              : 'text-slate-700 hover:bg-slate-100'
+          }`}
+          title="Dynamic Seating Capacity & Table Spacing Calculator (Planner / Pro)"
+        >
+          <Calculator className="w-3.5 h-3.5 text-indigo-600" />
+          <span className="hidden md:inline">Capacity & Spacing</span>
+          {!canAccessFeature(activePlan, 'SEATING_CAPACITY_CALCULATOR').allowed && (
+            <Lock className="w-2.5 h-2.5 text-amber-500" />
+          )}
+        </button>
+
+        {/* Figma-style Pin Comments Toggle */}
+        <button
+          id="btn-pin-comment"
+          onClick={() => setIsPlacingComment((prev) => !prev)}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+            isPlacingComment
+              ? 'bg-amber-500 text-white shadow-2xs'
+              : 'text-slate-700 hover:bg-slate-100'
+          }`}
+          title="Drop a feedback comment pin on the floor plan"
+        >
+          <MessageSquare className="w-3.5 h-3.5 text-amber-500" />
+          <span className="hidden md:inline">Comments</span>
+          {comments.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+              {comments.length}
+            </span>
+          )}
         </button>
 
         <div className="h-4 w-px bg-slate-200 mx-0.5" />
@@ -1922,6 +2025,49 @@ export const Canvas: React.FC<CanvasProps> = ({
             </g>
           )}
         </svg>
+
+        {/* Pin Comments Overlay (Interactive pins placed inside zoom/pan coordinate space) */}
+        <CommentsOverlay
+          comments={comments}
+          activeCommentId={activeCommentId}
+          onSelectComment={setActiveCommentId}
+          onAddComment={(newComment) => {
+            const comment: PinComment = {
+              ...newComment,
+              id: `comment-${Date.now()}`,
+              createdAt: new Date().toISOString()
+            };
+            setComments((prev) => [...prev, comment]);
+            setActiveCommentId(comment.id);
+          }}
+          onResolveComment={(id) => {
+            setComments((prev) =>
+              prev.map((c) => (c.id === id ? { ...c, isResolved: !c.isResolved } : c))
+            );
+          }}
+          onDeleteComment={(id) => {
+            setComments((prev) => prev.filter((c) => c.id !== id));
+            if (activeCommentId === id) setActiveCommentId(null);
+          }}
+          currentUserRole={activeRole}
+          currentUserName={
+            activeRole === 'owner'
+              ? 'Host (Owner)'
+              : activeRole === 'editor'
+              ? 'Lead Designer'
+              : 'Client Reviewer'
+          }
+          currentUserAvatar={
+            activeRole === 'owner' ? '👑' : activeRole === 'editor' ? '📐' : '💬'
+          }
+          currentUserColor={
+            activeRole === 'owner' ? '#6366f1' : activeRole === 'editor' ? '#0ea5e9' : '#f59e0b'
+          }
+          isPlacingComment={isPlacingComment}
+          onCancelPlacing={() => setIsPlacingComment(false)}
+          gridSize={scaleRatio}
+          zoom={zoom}
+        />
       </div>
 
       {/* Empty Blank Canvas Quick-Start Guide */}
@@ -2139,7 +2285,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           {/* Duplicate */}
           <button
             id="btn-hud-duplicate"
-            onClick={() => onDuplicateElement(selectedElement.id)}
+            onClick={() => {
+              if (!canPerformAction(activeRole, 'edit_objects')) {
+                setPermissionNotice('Collaborator Mode: Only Editors and Admins can duplicate elements.');
+                setTimeout(() => setPermissionNotice(null), 3500);
+                return;
+              }
+              onDuplicateElement(selectedElement.id);
+            }}
             title="Duplicate (Ctrl+D)"
             className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition"
           >
@@ -2149,7 +2302,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           {/* Lock / Unlock */}
           <button
             id="btn-hud-lock"
-            onClick={() => onUpdateElement({ ...selectedElement, locked: !selectedElement.locked })}
+            onClick={() => {
+              if (!canPerformAction(activeRole, 'edit_objects')) {
+                setPermissionNotice('Collaborator Mode: Only Editors and Admins can lock/unlock elements.');
+                setTimeout(() => setPermissionNotice(null), 3500);
+                return;
+              }
+              onUpdateElement({ ...selectedElement, locked: !selectedElement.locked });
+            }}
             title={selectedElement.locked ? 'Unlock element' : 'Lock position'}
             className={`p-1.5 rounded-lg transition ${
               selectedElement.locked ? 'text-amber-600 bg-amber-50' : 'text-slate-600 hover:bg-slate-100'
@@ -2161,7 +2321,14 @@ export const Canvas: React.FC<CanvasProps> = ({
           {/* Delete */}
           <button
             id="btn-hud-delete"
-            onClick={() => onDeleteElement(selectedElement.id)}
+            onClick={() => {
+              if (!canPerformAction(activeRole, 'edit_objects')) {
+                setPermissionNotice('Collaborator Mode: Only Editors and Admins can delete elements.');
+                setTimeout(() => setPermissionNotice(null), 3500);
+                return;
+              }
+              onDeleteElement(selectedElement.id);
+            }}
             title="Delete element (Del)"
             className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 active:bg-rose-100 transition"
           >
@@ -2169,6 +2336,43 @@ export const Canvas: React.FC<CanvasProps> = ({
           </button>
         </div>
       )}
+
+      {/* Permission Restriction Toast Banner */}
+      {permissionNotice && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-amber-500/50 flex items-center gap-3 text-xs animate-in fade-in slide-in-from-top-3">
+          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span className="font-semibold text-slate-200">{permissionNotice}</span>
+          <button
+            onClick={() => setPermissionNotice(null)}
+            className="p-1 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Dynamic Seating Capacity & Spacing Calculator */}
+      <CapacityCalculatorModal
+        isOpen={isCalculatorOpen}
+        onClose={() => setIsCalculatorOpen(false)}
+        floorPlan={floorPlan}
+        onSelectElement={onSelectElement}
+      />
+
+      {/* Paywall Modal */}
+      <PaywallModal
+        isOpen={!!paywallFeature}
+        onClose={() => setPaywallFeature(null)}
+        featureKey={paywallFeature}
+        currentPlan={activePlan}
+        onUpgradeSuccess={(newPlan) => {
+          setActivePlan(newPlan);
+          setStoredPlanTier(newPlan);
+          if (onUpgradePlan) onUpgradePlan(newPlan);
+          setPaywallFeature(null);
+        }}
+        onOpenFullPricing={onOpenPricing}
+      />
     </div>
   );
 };

@@ -609,6 +609,7 @@ interface ClientMeta {
   name: string;
   color: string;
   avatar: string;
+  role?: string;
   projectId: string | null;
   cursor?: { x: number; y: number };
   selectedElementId?: string | null;
@@ -627,6 +628,7 @@ function getRoomUsers(projectId: string) {
         name: client.name,
         color: client.color,
         avatar: client.avatar,
+        role: client.role || 'editor',
         cursor: client.cursor,
         selectedElementId: client.selectedElementId
       });
@@ -670,6 +672,7 @@ wss.on('connection', (ws: WebSocket) => {
             client.name = data.user.name || client.name;
             client.color = data.user.color || client.color;
             client.avatar = data.user.avatar || client.avatar;
+            client.role = data.user.role || client.role || 'editor';
           }
 
           // Send current room presence to all members in room

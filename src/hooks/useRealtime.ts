@@ -4,6 +4,7 @@ import { Collaborator, FloorElement, FloorPlan } from '../types';
 interface UseRealtimeProps {
   projectId: string;
   floorPlan: FloorPlan;
+  userRole?: 'owner' | 'editor' | 'commenter' | 'viewer';
   onRemoteElementUpdate: (element: FloorElement) => void;
   onRemoteElementCreate: (element: FloorElement) => void;
   onRemoteElementDelete: (elementId: string) => void;
@@ -23,6 +24,7 @@ const COLOR_OPTIONS = [
 export function useRealtime({
   projectId,
   floorPlan,
+  userRole = 'editor',
   onRemoteElementUpdate,
   onRemoteElementCreate,
   onRemoteElementDelete,
@@ -39,9 +41,26 @@ export function useRealtime({
       id,
       name: savedName,
       color: savedColor,
-      avatar: savedAvatar
+      avatar: savedAvatar,
+      role: userRole
     };
   });
+
+  // Keep role in sync with active userRole prop
+  useEffect(() => {
+    setCurrentUser((prev) => {
+      if (prev.role === userRole) return prev;
+      const updated = { ...prev, role: userRole };
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({
+          type: 'join',
+          projectId,
+          user: updated
+        }));
+      }
+      return updated;
+    });
+  }, [userRole, projectId]);
 
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
@@ -248,6 +267,7 @@ export function useRealtime({
       name: 'Sarah (Event Lead)',
       color: '#ec4899',
       avatar: '👩‍💼',
+      role: 'editor',
       cursor: { x: 300, y: 220 },
       selectedElementId: null
     };
@@ -256,6 +276,7 @@ export function useRealtime({
       name: 'Chef Marc',
       color: '#10b981',
       avatar: '👨‍🍳',
+      role: 'commenter',
       cursor: { x: 500, y: 350 },
       selectedElementId: null
     };

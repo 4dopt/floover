@@ -30,12 +30,21 @@ import {
   Zap,
   Plus,
   Minus,
-  Target
+  Target,
+  Lock,
+  Code,
+  Crosshair,
+  Building2
 } from 'lucide-react';
 import { FloorPlan, FloorElement, Point2D, TableStatus } from '../types';
 import { getEffectiveBoundaryPoints } from '../utils/roomGeometry';
 import { getChairPositions } from '../utils/chairLayout';
 import { getElementSubtype } from './ArchitecturalElementRenderer';
+import { PlanTierId, FeatureKey } from '../types/entitlements';
+import { canAccessFeature, getStoredPlanTier, setStoredPlanTier } from '../utils/entitlements';
+import { PaywallModal } from './PaywallModal';
+import { Embed3DModal } from './Embed3DModal';
+import { FloordoneLogo } from './FloordoneLogo';
 
 // Helper to test if a 3D coordinate is safely within the room floor boundary
 function isInsideRoom(
@@ -74,6 +83,9 @@ interface Canvas3DProps {
   onClose3D: () => void;
   onSelectElement?: (id: string | null) => void;
   selectedElementId?: string | null;
+  currentPlan?: PlanTierId;
+  onUpgradePlan?: (tier: PlanTierId) => void;
+  onOpenPricing?: () => void;
 }
 
 type CameraPreset = 'isometric' | 'topdown' | 'walkthrough' | 'front';
@@ -85,10 +97,42 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
   floorPlan,
   onClose3D,
   onSelectElement,
-  selectedElementId
+  selectedElementId,
+  currentPlan: initialCurrentPlan,
+  onUpgradePlan,
+  onOpenPricing
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Active Plan Tier State (reactive to global simulator or storage)
+  const [activePlan, setActivePlan] = useState<PlanTierId>(() => {
+    return initialCurrentPlan || getStoredPlanTier();
+  });
+
+  useEffect(() => {
+    if (initialCurrentPlan) {
+      setActivePlan(initialCurrentPlan);
+    }
+  }, [initialCurrentPlan]);
+
+  useEffect(() => {
+    const handleTierChange = (e: any) => {
+      if (e.detail?.tier) {
+        setActivePlan(e.detail.tier);
+      }
+    };
+    window.addEventListener('floordone:tier-changed', handleTierChange);
+    return () => window.removeEventListener('floordone:tier-changed', handleTierChange);
+  }, []);
+
+  // Paywall & Feature Gating Modal State
+  const [paywallFeature, setPaywallFeature] = useState<FeatureKey | null>(null);
+  const [isEmbedModalOpen, setIsEmbedModalOpen] = useState(false);
+
+  // Sightline Tool State (Venue Feature)
+  const [isSightlineMode, setIsSightlineMode] = useState(false);
+  const [sightlineTableId, setSightlineTableId] = useState<string | null>(null);
 
   // Visual Atmosphere & Rendering State
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>('isometric');
@@ -662,6 +706,14 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
   // Set camera to preset angles
   const applyCameraPreset = (preset: CameraPreset) => {
     if (!cameraRef.current) return;
+
+    if (preset === 'walkthrough') {
+      if (!canAccessFeature(activePlan, 'FULL_3D_WALKTHROUGH').allowed) {
+        setPaywallFeature('FULL_3D_WALKTHROUGH');
+        return;
+      }
+    }
+
     setCameraPreset(preset);
 
     const cam = cameraRef.current;
@@ -793,6 +845,28 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
     }
   };
 
+  // Focus camera at eye-level from a specific table toward room center/stage
+  const handleSelectSightlineTable = (tableId: string) => {
+    setSightlineTableId(tableId);
+    const table = floorPlan.elements.find((e) => e.id === tableId);
+    if (!table || !cameraRef.current) return;
+
+    const cam = cameraRef.current;
+    const ctrl = controlsRef.current;
+
+    // Seated guest eye level: ~4.5 feet (1.37m)
+    const tableCenterX = (table.x + table.width / 2) * scale;
+    const tableCenterZ = (table.y + table.height / 2) * scale;
+
+    cam.position.set(tableCenterX, 4.5, tableCenterZ);
+
+    if (ctrl) {
+      ctrl.enabled = true;
+      ctrl.target.set(roomCenterX, 4.0, roomCenterZ);
+      ctrl.update();
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -900,6 +974,25 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
         >
           {isAutoRotating ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
           <span className="hidden md:inline">Showcase</span>
+        </button>
+
+        {/* Embed 3D View (Venue / Studio Feature) */}
+        <button
+          onClick={() => {
+            if (canAccessFeature(activePlan, 'EMBEDDABLE_3D_IFRAME').allowed) {
+              setIsEmbedModalOpen(true);
+            } else {
+              setPaywallFeature('EMBEDDABLE_3D_IFRAME');
+            }
+          }}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-white border border-slate-700/80 text-xs font-bold shadow-xl transition cursor-pointer"
+          title="Get Embeddable 3D iFrame Code for Venue Websites (Venue / Studio)"
+        >
+          <Code className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden md:inline">Embed 3D</span>
+          {!canAccessFeature(activePlan, 'EMBEDDABLE_3D_IFRAME').allowed && (
+            <Lock className="w-3 h-3 text-amber-400 ml-0.5" />
+          )}
         </button>
 
         {/* Capture High-Res 3D Snapshot */}
@@ -1239,28 +1332,46 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
           <Sparkles className="w-3.5 h-3.5 text-amber-400" />
           <span className="text-[11px] font-semibold text-slate-400">Lighting:</span>
           <button
-            onClick={() => setLightingPreset('banquet')}
+            onClick={() => {
+              if (canAccessFeature(activePlan, 'LIGHTING_ENVIRONMENTS').allowed) {
+                setLightingPreset('banquet');
+              } else {
+                setPaywallFeature('LIGHTING_ENVIRONMENTS');
+              }
+            }}
             className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
               lightingPreset === 'banquet'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
-            title="Warm Golden Banquet Glow & Chandelier Reflections"
+            title="Warm Golden Banquet Glow & Chandelier Reflections (Venue / Studio)"
           >
             <Moon className="w-3 h-3 text-amber-200" />
             <span>Banquet</span>
+            {!canAccessFeature(activePlan, 'LIGHTING_ENVIRONMENTS').allowed && (
+              <Lock className="w-2.5 h-2.5 text-amber-400" />
+            )}
           </button>
           <button
-            onClick={() => setLightingPreset('daylight')}
+            onClick={() => {
+              if (canAccessFeature(activePlan, 'LIGHTING_ENVIRONMENTS').allowed) {
+                setLightingPreset('daylight');
+              } else {
+                setPaywallFeature('LIGHTING_ENVIRONMENTS');
+              }
+            }}
             className={`px-2 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
               lightingPreset === 'daylight'
                 ? 'bg-sky-600 text-white shadow-xs'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'
             }`}
-            title="Bright Natural Daylight & Clear Soft Shadows"
+            title="Bright Natural Daylight & Clear Soft Shadows (Venue / Studio)"
           >
             <Sun className="w-3 h-3 text-amber-200" />
             <span>Daylight</span>
+            {!canAccessFeature(activePlan, 'LIGHTING_ENVIRONMENTS').allowed && (
+              <Lock className="w-2.5 h-2.5 text-amber-400" />
+            )}
           </button>
           <button
             onClick={() => setLightingPreset('studio')}
@@ -1274,6 +1385,38 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
             <span>Studio</span>
           </button>
         </div>
+
+        {/* Guest Sightline Inspection Tool (Venue / Studio) */}
+        <button
+          onClick={() => {
+            if (canAccessFeature(activePlan, '3D_EYE_LEVEL').allowed) {
+              const nextMode = !isSightlineMode;
+              setIsSightlineMode(nextMode);
+              if (nextMode) {
+                const firstTable = floorPlan.elements.find((e) => e.type === 'table');
+                if (firstTable) {
+                  handleSelectSightlineTable(firstTable.id);
+                }
+              } else {
+                applyCameraPreset('isometric');
+              }
+            } else {
+              setPaywallFeature('3D_EYE_LEVEL');
+            }
+          }}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 ${
+            isSightlineMode
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800'
+          }`}
+          title="Guest Eye-Level Sightline Tool: Test views to stage or head table from specific tables (Venue / Studio)"
+        >
+          <Crosshair className="w-3 h-3 text-emerald-400" />
+          <span>Guest Sightlines</span>
+          {!canAccessFeature(activePlan, '3D_EYE_LEVEL').allowed && (
+            <Lock className="w-3 h-3 text-amber-400" />
+          )}
+        </button>
 
         {/* Tableware Setting Toggle */}
         <button
@@ -1303,6 +1446,87 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
           <span>Badges</span>
         </button>
       </div>
+
+      {/* Guest Eye-Level Sightline Tool HUD Overlay */}
+      {isSightlineMode && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-30 bg-slate-900/95 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-emerald-500/50 shadow-2xl flex items-center gap-3 text-xs text-white animate-in fade-in slide-in-from-top-3">
+          <div className="flex items-center gap-2">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="font-bold text-emerald-300 uppercase tracking-wider text-[10px]">
+              Guest Eye-Level Sightline
+            </span>
+          </div>
+          <span className="text-slate-500">|</span>
+          <div className="flex items-center gap-2">
+            <label className="text-slate-300 font-medium text-xs">Viewing From:</label>
+            <select
+              value={sightlineTableId || ''}
+              onChange={(e) => handleSelectSightlineTable(e.target.value)}
+              className="bg-slate-800 text-white font-bold text-xs rounded-lg px-2.5 py-1 border border-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
+            >
+              {floorPlan.elements
+                .filter((e) => e.type === 'table')
+                .map((table) => (
+                  <option key={table.id} value={table.id}>
+                    {table.name} ({table.covers} seats)
+                  </option>
+                ))}
+            </select>
+          </div>
+          <div className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+            Focal Sightline: 100% Clear
+          </div>
+          <button
+            onClick={() => {
+              setIsSightlineMode(false);
+              applyCameraPreset('isometric');
+            }}
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+            title="Exit Sightline Mode"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 3D Watermark (Free Tier Only) */}
+      {!canAccessFeature(activePlan, 'REMOVE_3D_WATERMARK').allowed && (
+        <div className="absolute bottom-16 right-4 z-20 flex items-center gap-2.5 bg-slate-950/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl">
+          <FloordoneLogo size="xs" showWordmark={true} />
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+            Free Preview
+          </span>
+          <button
+            onClick={() => setPaywallFeature('REMOVE_3D_WATERMARK')}
+            className="ml-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shadow-xs transition cursor-pointer"
+          >
+            Upgrade to Remove
+          </button>
+        </div>
+      )}
+
+      {/* Paywall Modal for Locked Features */}
+      <PaywallModal
+        isOpen={!!paywallFeature}
+        onClose={() => setPaywallFeature(null)}
+        featureKey={paywallFeature}
+        currentPlan={activePlan}
+        onUpgradeSuccess={(newPlan) => {
+          setActivePlan(newPlan);
+          setStoredPlanTier(newPlan);
+          if (onUpgradePlan) onUpgradePlan(newPlan);
+          setPaywallFeature(null);
+        }}
+        onOpenFullPricing={onOpenPricing}
+      />
+
+      {/* Embed 3D View Modal */}
+      <Embed3DModal
+        isOpen={isEmbedModalOpen}
+        onClose={() => setIsEmbedModalOpen(false)}
+        projectId={floorPlan.id}
+        projectName={floorPlan.name}
+      />
 
       {/* Bottom Right: Quick Interaction Guide */}
       <div className="absolute bottom-4 right-4 z-20 hidden xl:flex items-center gap-2 text-[11px] text-slate-400 bg-slate-900/85 px-3 py-1.5 rounded-xl border border-slate-800/80 shadow-lg">

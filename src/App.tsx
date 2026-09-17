@@ -14,6 +14,14 @@ import { FloorPlan, FloorElement, FurniturePreset, RoomTemplate, ProjectSummary,
 import { useRealtime } from './hooks/useRealtime';
 import { FURNITURE_PRESETS } from './data/furniturePresets';
 import { ROOM_TEMPLATES } from './data/roomTemplates';
+import { PlanTierId, CollaboratorRole } from './types/entitlements';
+import {
+  getStoredPlanTier,
+  setStoredPlanTier,
+  getStoredCollabRole,
+  setStoredCollabRole
+} from './utils/entitlements';
+import { RoleAndTierSimulator } from './components/RoleAndTierSimulator';
 
 // Initial starter project
 const DEFAULT_FLOOR_PLAN: FloorPlan = {
@@ -198,10 +206,25 @@ const DEFAULT_FLOOR_PLAN: FloorPlan = {
 
 export default function App() {
   const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing'>('landing');
-  const [userPlan, setUserPlan] = useState<PricingPlanId>(() => {
-    const saved = (localStorage.getItem('floordone_user_plan') || localStorage.getItem('floover_user_plan')) as PricingPlanId;
-    return saved || 'free';
-  });
+  const [userPlan, setUserPlan] = useState<PlanTierId>(() => getStoredPlanTier());
+  const [userRole, setUserRole] = useState<CollaboratorRole>(() => getStoredCollabRole());
+  const [tempEditorOverride, setTempEditorOverride] = useState(false);
+
+  useEffect(() => {
+    const handleTierChange = (e: any) => {
+      if (e.detail?.tier) setUserPlan(e.detail.tier);
+    };
+    const handleRoleChange = (e: any) => {
+      if (e.detail?.role) setUserRole(e.detail.role);
+    };
+    window.addEventListener('floordone:tier-changed', handleTierChange);
+    window.addEventListener('floordone:role-changed', handleRoleChange);
+    return () => {
+      window.removeEventListener('floordone:tier-changed', handleTierChange);
+      window.removeEventListener('floordone:role-changed', handleRoleChange);
+    };
+  }, []);
+
   const [isQuestionnaireOpen, setIsQuestionnaireOpen] = useState(false);
   const [floorPlan, setFloorPlan] = useState<FloorPlan>(DEFAULT_FLOOR_PLAN);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
@@ -223,12 +246,32 @@ export default function App() {
   const [isCollaborationOpen, setIsCollaborationOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isNewPlanModalOpen, setIsNewPlanModalOpen] = useState(false);
+  const [sharedLinkBanner, setSharedLinkBanner] = useState<{
+    role: CollaboratorRole;
+    elementId?: string | null;
+  } | null>(null);
 
-  // Check URL query on mount (e.g. ?project=xyz or ?view=editor)
+  // Check URL query on mount (e.g. ?project=xyz&role=commenter&element=t-02)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const projId = params.get('project');
     const viewParam = params.get('view');
+    const roleParam = params.get('role') as CollaboratorRole | null;
+    const elementParam = params.get('element');
+
+    if (roleParam && ['owner', 'editor', 'commenter', 'viewer'].includes(roleParam)) {
+      setUserRole(roleParam);
+      setStoredCollabRole(roleParam);
+      setSharedLinkBanner({
+        role: roleParam,
+        elementId: elementParam || null
+      });
+    }
+
+    if (elementParam) {
+      setSelectedElementId(elementParam);
+    }
+
     if (projId && projId !== floorPlan.id) {
       loadProjectById(projId);
       setActiveView('editor');
@@ -337,6 +380,7 @@ export default function App() {
   } = useRealtime({
     projectId: floorPlan.id,
     floorPlan,
+    userRole,
     onRemoteElementUpdate: (element) => {
       setFloorPlan((prev) => {
         const idx = prev.elements.findIndex((e) => e.id === element.id);
@@ -721,28 +765,75 @@ export default function App() {
     <div id="app-root-container" className="flex flex-col h-screen w-screen bg-slate-100 overflow-hidden font-sans">
       {/* 1. Designer Header Bar (ONLY displayed inside the actual floor designer) */}
       {activeView === 'editor' && (
-        <Navbar
-          activeView={activeView}
-          setActiveView={setActiveView}
-          floorPlan={floorPlan}
-          onNewProject={() => setIsNewPlanModalOpen(true)}
-          onSaveProject={() => saveProjectToCloud(floorPlan)}
-          isSaving={isSaving}
-          syncStatus={syncStatus}
-          canUndo={historyIndex > 0}
-          canRedo={historyIndex < history.length - 1}
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          snapToGrid={snapToGrid}
-          setSnapToGrid={setSnapToGrid}
-          showGrid={showGrid}
-          setShowGrid={setShowGrid}
-          collaborators={collaborators}
-          currentUser={currentUser}
-          userPlan={userPlan}
-          onOpenCollaboration={() => setIsCollaborationOpen(true)}
-          onOpenExport={() => setIsExportOpen(true)}
-        />
+        <>
+          {/* Figma-Style Live Link Joining Notification Banner */}
+          {sharedLinkBanner && (
+            <div className="bg-slate-900 text-white px-4 py-2 flex items-center justify-between text-xs border-b border-slate-700 z-30 shadow-md">
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-bold text-blue-400">
+                  Figma Live Link:
+                </span>
+                <span>
+                  You joined &quot;{floorPlan.name}&quot; with permission{' '}
+                  <strong className="text-white bg-blue-600/30 text-blue-300 px-2 py-0.5 rounded-md border border-blue-500/40">
+                    {sharedLinkBanner.role === 'commenter'
+                      ? '💬 Client Reviewer (Can comment)'
+                      : sharedLinkBanner.role === 'viewer'
+                      ? '👁️ Guest (Can view)'
+                      : '✏️ Co-Editor (Can edit)'}
+                  </strong>
+                </span>
+                <span className="text-slate-400 hidden lg:inline">
+                  {sharedLinkBanner.role === 'commenter'
+                    ? '• Pin comments on tables & inspect in 3D walkthrough'
+                    : sharedLinkBanner.role === 'viewer'
+                    ? '• Read-only 2D/3D floor inspection'
+                    : '• Live co-design and real-time syncing enabled'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setIsCollaborationOpen(true)}
+                  className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition text-[11px] cursor-pointer"
+                >
+                  Share Link
+                </button>
+                <button
+                  onClick={() => setSharedLinkBanner(null)}
+                  className="p-1 text-slate-400 hover:text-white rounded-md hover:bg-white/10 transition cursor-pointer"
+                  title="Dismiss banner"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
+
+          <Navbar
+            activeView={activeView}
+            setActiveView={setActiveView}
+            floorPlan={floorPlan}
+            onNewProject={() => setIsNewPlanModalOpen(true)}
+            onSaveProject={() => saveProjectToCloud(floorPlan)}
+            isSaving={isSaving}
+            syncStatus={syncStatus}
+            canUndo={historyIndex > 0}
+            canRedo={historyIndex < history.length - 1}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            snapToGrid={snapToGrid}
+            setSnapToGrid={setSnapToGrid}
+            showGrid={showGrid}
+            setShowGrid={setShowGrid}
+            collaborators={collaborators}
+            currentUser={currentUser}
+            userPlan={userPlan}
+            onOpenCollaboration={() => setIsCollaborationOpen(true)}
+            onOpenExport={() => setIsExportOpen(true)}
+          />
+        </>
       )}
 
       {/* 2. Main Content Body */}
@@ -777,6 +868,13 @@ export default function App() {
               collaborators={collaborators}
               onCursorMove={sendCursor}
               onOpenTemplates={() => setActiveView('templates')}
+              currentPlan={userPlan}
+              collabRole={userRole}
+              onUpgradePlan={(tier) => {
+                setUserPlan(tier);
+                setStoredPlanTier(tier);
+              }}
+              onOpenPricing={() => setActiveView('pricing')}
             />
           </>
         )}
@@ -814,13 +912,16 @@ export default function App() {
               onOpenTemplates={() => setActiveView('templates')}
               onOpenDashboard={() => setActiveView('dashboard')}
               currentPlan={userPlan}
-              onSelectPlan={(plan) => setUserPlan(plan)}
+              onSelectPlan={(plan) => {
+                setUserPlan(plan);
+                setStoredPlanTier(plan);
+              }}
             />
           </div>
         )}
       </main>
 
-      {/* 3. Real-Time Team Collaboration Dialog */}
+      {/* 3. Real-Time Team Collaboration & Figma-Style Share Dialog */}
       <CollaborationModal
         isOpen={isCollaborationOpen}
         onClose={() => setIsCollaborationOpen(false)}
@@ -829,8 +930,16 @@ export default function App() {
         collaborators={collaborators}
         connectionStatus={connectionStatus}
         projectId={floorPlan.id}
+        projectName={floorPlan.name}
+        selectedElement={floorPlan.elements.find((e) => e.id === selectedElementId) || null}
+        elements={floorPlan.elements}
         isSimulatedActive={isSimulatedActive}
         onToggleSimulated={setIsSimulatedActive}
+        activeRole={userRole}
+        onChangeActiveRole={(role) => {
+          setUserRole(role);
+          setStoredCollabRole(role);
+        }}
       />
 
       {/* 4. Export PDF / PNG / JSON Dialog */}
@@ -838,6 +947,12 @@ export default function App() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         floorPlan={floorPlan}
+        currentPlan={userPlan}
+        onUpgradePlan={(tier) => {
+          setUserPlan(tier);
+          setStoredPlanTier(tier);
+        }}
+        onOpenPricing={() => setActiveView('pricing')}
       />
 
       {/* 5. New Floor Plan (Blank or Template) Dialog */}
@@ -859,6 +974,22 @@ export default function App() {
         isOpen={isQuestionnaireOpen}
         onClose={() => setIsQuestionnaireOpen(false)}
         onComplete={handleQuestionnaireComplete}
+      />
+
+      {/* 7. Product Tier & Role Permission Simulator Widget */}
+      <RoleAndTierSimulator
+        currentPlan={userPlan}
+        onChangePlan={(newPlan) => {
+          setUserPlan(newPlan);
+          setStoredPlanTier(newPlan);
+        }}
+        currentRole={userRole}
+        onChangeRole={(newRole) => {
+          setUserRole(newRole);
+          setStoredCollabRole(newRole);
+        }}
+        tempEditorOverride={tempEditorOverride}
+        onToggleTempEditorOverride={setTempEditorOverride}
       />
     </div>
   );
