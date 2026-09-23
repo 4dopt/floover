@@ -10,6 +10,7 @@ import { NewPlanModal } from './components/NewPlanModal';
 import { LandingPage } from './components/LandingPage';
 import { MarketingQuestionnaireModal } from './components/MarketingQuestionnaireModal';
 import { PricingPage } from './components/PricingPage';
+import { BlogPage } from './components/BlogPage';
 import { FloorPlan, FloorElement, FurniturePreset, RoomTemplate, ProjectSummary, PricingPlanId } from './types';
 import { useRealtime } from './hooks/useRealtime';
 import { FURNITURE_PRESETS } from './data/furniturePresets';
@@ -215,7 +216,7 @@ const DEFAULT_FLOOR_PLAN: FloorPlan = {
 };
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing'>(() => {
+  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing' | 'blogs'>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       // If URL contains any live collaboration or project params, land DIRECTLY in the designer canvas
@@ -223,11 +224,18 @@ export default function App() {
         return 'editor';
       }
       const view = params.get('view');
-      if (view === 'dashboard' || view === 'templates' || view === 'pricing') {
+      if (view === 'dashboard' || view === 'templates' || view === 'pricing' || view === 'blogs') {
         return view;
       }
     }
     return 'landing';
+  });
+  const [blogSlug, setBlogSlug] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('slug');
+    }
+    return null;
   });
   const [userPlan, setUserPlan] = useState<PlanTierId>(() => getStoredPlanTier());
   const [userRole, setUserRole] = useState<CollaboratorRole>(() => getStoredCollabRole());
@@ -301,8 +309,11 @@ export default function App() {
       loadProjectById(projId, elementParam);
     } else if (roleParam || elementParam || viewParam === 'editor') {
       setActiveView('editor');
-    } else if (viewParam === 'dashboard' || viewParam === 'templates' || viewParam === 'pricing') {
+    } else if (viewParam === 'dashboard' || viewParam === 'templates' || viewParam === 'pricing' || viewParam === 'blogs') {
       setActiveView(viewParam);
+      if (viewParam === 'blogs') {
+        setBlogSlug(params.get('slug'));
+      }
     }
   }, []);
 
@@ -865,6 +876,10 @@ export default function App() {
           onOpenDashboard={() => setActiveView('dashboard')}
           onOpenTemplates={() => setActiveView('templates')}
           onOpenPricing={() => setActiveView('pricing')}
+          onOpenBlogs={(slug) => {
+            setBlogSlug(slug || null);
+            setActiveView('blogs');
+          }}
         />
 
         <MarketingQuestionnaireModal
@@ -873,6 +888,32 @@ export default function App() {
           onComplete={handleQuestionnaireComplete}
         />
       </div>
+    );
+  }
+
+  // Blog and Resource Hub View
+  if (activeView === 'blogs') {
+    return (
+      <BlogPage
+        initialSlug={blogSlug}
+        onSelectPost={(slug) => setBlogSlug(slug || null)}
+        onOpenEditor={(templateId) => {
+          if (templateId) {
+            const tmpl = ROOM_TEMPLATES.find((t) => t.id === templateId);
+            if (tmpl) {
+              handleApplyTemplate(tmpl);
+              return;
+            }
+          }
+          setActiveView('editor');
+        }}
+        onNavigateHome={() => {
+          setActiveView('landing');
+          setBlogSlug(null);
+        }}
+        onOpenPricing={() => setActiveView('pricing')}
+        onOpenTemplates={() => setActiveView('templates')}
+      />
     );
   }
 

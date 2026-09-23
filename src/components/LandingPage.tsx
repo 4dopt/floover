@@ -37,6 +37,7 @@ interface LandingPageProps {
   onOpenDashboard: () => void;
   onOpenTemplates: () => void;
   onOpenPricing?: () => void;
+  onOpenBlogs?: (slug?: string) => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -44,7 +45,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenEditor,
   onOpenDashboard,
   onOpenTemplates,
-  onOpenPricing
+  onOpenPricing,
+  onOpenBlogs
 }) => {
   // Interactive Hero Preview state
   const [activeTableId, setActiveTableId] = useState<string>('t-01');
@@ -121,6 +123,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#pricing" className="hover:text-slate-900 transition flex items-center gap-1 text-slate-600 font-semibold">
               Pricing
             </a>
+            <button
+              onClick={() => {
+                if (onOpenBlogs) onOpenBlogs();
+              }}
+              className="hover:text-slate-900 transition font-semibold text-slate-600 cursor-pointer"
+            >
+              Blog
+            </button>
             <a href="#testimonials" className="hover:text-slate-900 transition">
               Reviews
             </a>
@@ -1159,6 +1169,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="hover:text-slate-300 transition"
             >
               Project Dashboard
+            </button>
+            <button
+              onClick={() => {
+                if (onOpenBlogs) onOpenBlogs();
+              }}
+              className="hover:text-slate-300 transition text-slate-300"
+            >
+              Guides & Blog
             </button>
             <button
               onClick={() => onOpenEditor()}

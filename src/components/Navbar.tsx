@@ -17,6 +17,7 @@ import {
   Home,
   Tag,
   Crown,
+  BookOpen,
   Menu,
   X,
   ChevronLeft,
@@ -28,8 +29,8 @@ import { getEffectiveCovers } from '../utils/chairLayout';
 import { FloordoneLogo } from './FloordoneLogo';
 
 interface NavbarProps {
-  activeView: 'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing';
-  setActiveView: (view: 'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing') => void;
+  activeView: 'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing' | 'blogs';
+  setActiveView: (view: 'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing' | 'blogs') => void;
   floorPlan: FloorPlan;
   onNewProject: () => void;
   onSaveProject: () => void;
@@ -236,6 +237,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Tag className="w-3.5 h-3.5 text-indigo-500" />
               Pricing
+            </button>
+            <button
+              id="nav-tab-blogs"
+              onClick={() => setActiveView('blogs')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeView === 'blogs'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
+              Blog
             </button>
           </div>
         </div>
@@ -473,6 +486,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Tag className="w-4 h-4 text-indigo-600" />
               Pricing
+            </button>
+
+            <button
+              id="mobile-nav-blog"
+              onClick={() => {
+                setActiveView('blogs');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`p-3 rounded-xl border flex items-center gap-2.5 font-bold text-xs transition ${
+                activeView === 'blogs'
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}
+            >
+              <BookOpen className="w-4 h-4 text-emerald-600" />
+              Blog
             </button>
           </div>
 
