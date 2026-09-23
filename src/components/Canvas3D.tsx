@@ -1491,14 +1491,14 @@ export const Canvas3D: React.FC<Canvas3DProps> = ({
 
       {/* 3D Watermark (Free Tier Only) */}
       {!canAccessFeature(activePlan, 'REMOVE_3D_WATERMARK').allowed && (
-        <div className="absolute bottom-16 right-4 z-20 flex items-center gap-2.5 bg-slate-950/85 backdrop-blur-md px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-xl">
-          <FloordoneLogo size="xs" showWordmark={true} />
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className="absolute bottom-16 right-4 z-20 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700/60 shadow-xl select-none">
+          <FloordoneLogo size="xs" showWordmark={true} theme="dark" />
+          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider pl-1.5 border-l border-slate-700/80">
             Free Preview
           </span>
           <button
             onClick={() => setPaywallFeature('REMOVE_3D_WATERMARK')}
-            className="ml-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shadow-xs transition cursor-pointer"
+            className="ml-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-[10px] shadow-xs transition cursor-pointer shrink-0"
           >
             Upgrade to Remove
           </button>

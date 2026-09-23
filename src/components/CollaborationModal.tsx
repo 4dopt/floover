@@ -77,30 +77,58 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
   // Build the Figma-style dynamic live link
   const targetElementId = linkToSelection ? (selectedElement?.id || selectedElementIdForLink) : null;
   const queryParams = new URLSearchParams();
+  queryParams.set('view', 'editor');
   queryParams.set('project', projectId);
   queryParams.set('role', shareRole);
   if (targetElementId) {
     queryParams.set('element', targetElementId);
   }
-  const shareUrl = `${window.location.origin}?${queryParams.toString()}`;
+  const baseUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${window.location.pathname}`
+    : '';
+  const shareUrl = `${baseUrl}?${queryParams.toString()}`;
 
   // Build embeddable iframe snippet
-  const embedSnippet = `<iframe src="${window.location.origin}?project=${projectId}&role=viewer&embed=1" width="100%" height="600" frameborder="0" style="border:1px solid #e2e8f0;border-radius:12px;" allowfullscreen></iframe>`;
+  const embedSnippet = `<iframe src="${baseUrl}?view=editor&project=${projectId}&role=viewer&embed=1" width="100%" height="600" frameborder="0" style="border:1px solid #e2e8f0;border-radius:12px;" allowfullscreen></iframe>`;
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareUrl);
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+      throw new Error('Clipboard API unavailable');
+    } catch {
+      // Fallback for sandboxed iframes
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        return successful;
+      } catch (err) {
+        console.warn('Fallback copy error:', err);
+        return false;
+      }
+    }
+  };
+
+  const handleCopyLink = async () => {
+    await copyToClipboard(shareUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 2200);
   };
 
-  const handleCopyEmbed = () => {
-    navigator.clipboard.writeText(embedSnippet);
+  const handleCopyEmbed = async () => {
+    await copyToClipboard(embedSnippet);
     setCopiedEmbed(true);
     setTimeout(() => setCopiedEmbed(false), 2200);
-  };
-
-  const handleOpenLiveSecondTab = () => {
-    window.open(shareUrl, '_blank');
   };
 
   const currentSelectedEl = elements.find((e) => e.id === (selectedElement?.id || selectedElementIdForLink));
@@ -362,13 +390,16 @@ export const CollaborationModal: React.FC<CollaborationModalProps> = ({
                   Links auto-authenticate and connect via live WebSockets.
                 </span>
 
-                <button
-                  onClick={handleOpenLiveSecondTab}
+                <a
+                  id="btn-test-in-new-tab"
+                  href={shareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 hover:underline cursor-pointer"
                 >
-                  <span>Test in new window</span>
+                  <span>Test in new tab</span>
                   <ExternalLink className="w-3 h-3" />
-                </button>
+                </a>
               </div>
             </div>
 

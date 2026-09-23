@@ -31,7 +31,7 @@ import {
   activatePaidPlanLocally
 } from '../utils/lemonSqueezy';
 
-export type PlanId = 'free' | 'planner' | 'venue' | 'enterprise' | 'solo' | 'pro' | 'lifetime';
+export type PlanId = 'free' | 'planner' | 'venue' | 'enterprise';
 
 export interface PlanConfig {
   id: PlanId;
@@ -278,20 +278,20 @@ export const PricingPage: React.FC<PricingPageProps> = ({
 
       {/* 3. Hero Introduction */}
       <section className="pt-12 pb-10 sm:pt-16 sm:pb-14 px-4 text-center max-w-4xl mx-auto space-y-4">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-          <Zap className="w-3.5 h-3.5 text-emerald-600" />
-          <span>No $100/mo Corporate Bloat • Transparent Pocket-Friendly Pricing</span>
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-2xs">
+          <Zap className="w-3.5 h-3.5 text-indigo-600" />
+          <span>Transparent & Predictable Pricing • No Sales Pressure</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-          Professional Floor Plans for Less Than the Price of a{' '}
+          Professional Floor Plans at{' '}
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 via-indigo-600 to-indigo-800">
-            Single Espresso.
+            Honest, Predictable Rates.
           </span>
         </h1>
 
         <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          Why do legacy floor plan tools charge $80 to $150 a month? We built Floordone with modern, ultra-efficient tech so we can offer full-featured seating design starting at just <strong>$1.19/mo</strong>, or <strong>$9.99 once</strong> for life.
+          Why do legacy floor plan tools charge $80 to $150 a month with rigid contracts? Floordone gives you instant browser-native drafting, real-time multiplayer editing, and vector PDF manifests from just <strong>$24/mo</strong>.
         </p>
 
         {/* Billing Interval Switcher */}
@@ -356,12 +356,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
           {PRICING_PLANS.map((plan) => {
             const isCurrent = activePlan === plan.id;
-            const isLifetime = plan.id === 'lifetime';
-            const displayPrice = isLifetime
-              ? plan.oneTimePrice
-              : billingCycle === 'annual'
-              ? plan.annualMonthlyPrice
-              : plan.monthlyPrice;
+            const displayPrice =
+              billingCycle === 'annual'
+                ? plan.annualMonthlyPrice
+                : plan.monthlyPrice;
 
             return (
               <div
@@ -369,8 +367,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 className={`relative flex flex-col justify-between rounded-2xl bg-white p-6 transition-all duration-200 border ${
                   plan.highlighted
                     ? 'border-indigo-500 shadow-xl ring-2 ring-indigo-500/20 md:-translate-y-1'
-                    : isLifetime
-                    ? 'border-amber-300 shadow-lg bg-gradient-to-b from-amber-50/40 to-white'
+                    : plan.id === 'venue'
+                    ? 'border-emerald-300 shadow-md'
+                    : plan.id === 'enterprise'
+                    ? 'border-amber-300 shadow-md'
                     : 'border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md'
                 }`}
               >
@@ -414,12 +414,10 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                       ${displayPrice}
                     </span>
                     <span className="text-xs text-slate-500 font-semibold">
-                      {isLifetime
-                        ? 'one-time forever'
-                        : plan.monthlyPrice === 0
+                      {plan.monthlyPrice === 0
                         ? '/ forever'
                         : billingCycle === 'annual'
-                        ? '/ mo (billed $14.28/yr)'
+                        ? '/ mo (billed annually)'
                         : '/ month'}
                     </span>
                   </div>
@@ -489,9 +487,9 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                           ? 'bg-slate-100 text-slate-600 border border-slate-200 cursor-default'
                           : plan.highlighted
                           ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg'
-                          : isLifetime
-                          ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md hover:shadow-lg'
-                          : 'bg-slate-900 hover:bg-slate-800 text-white'
+                          : plan.id === 'venue'
+                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg'
+                          : 'bg-amber-600 hover:bg-amber-700 text-white shadow-md hover:shadow-lg'
                       }`}
                     >
                       {isCurrent ? (
@@ -501,7 +499,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                         </>
                       ) : (
                         <>
-                          Buy Pricing plans
+                          {plan.ctaText}
                           <ArrowRight className="w-3.5 h-3.5" />
                         </>
                       )}
@@ -509,9 +507,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                   )}
 
                   <p className="text-[10px] text-center text-slate-400 mt-2">
-                    {isLifetime
-                      ? 'No recurring charge • Instant activation'
-                      : plan.monthlyPrice === 0
+                    {plan.monthlyPrice === 0
                       ? 'No credit card required'
                       : 'Checkout securely via Lemon Squeezy'}
                   </p>
@@ -542,7 +538,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
               <thead>
                 <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[10px]">
                   <th className="py-3 px-3">Feature</th>
-                  <th className="py-3 px-3 text-emerald-700 font-black">Floordone (Solo/Pro)</th>
+                  <th className="py-3 px-3 text-indigo-700 font-black">Floordone (Planner / Venue)</th>
                   <th className="py-3 px-3">Legacy CAD Tools</th>
                   <th className="py-3 px-3">Enterprise Seating SaaS</th>
                 </tr>
@@ -550,15 +546,15 @@ export const PricingPage: React.FC<PricingPageProps> = ({
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 <tr>
                   <td className="py-3.5 px-3 font-semibold">Monthly Cost</td>
-                  <td className="py-3.5 px-3 text-emerald-600 font-black text-sm">$1.19 – $3.99 / mo</td>
+                  <td className="py-3.5 px-3 text-indigo-600 font-black text-sm">$24 – $79 / mo</td>
                   <td className="py-3.5 px-3 text-rose-500 font-semibold">$65.00 / mo</td>
                   <td className="py-3.5 px-3 text-rose-500 font-semibold">$120.00 / mo</td>
                 </tr>
                 <tr>
-                  <td className="py-3.5 px-3 font-semibold">Lifetime Option</td>
-                  <td className="py-3.5 px-3 text-emerald-600 font-bold">Yes ($9.99 once)</td>
-                  <td className="py-3.5 px-3 text-slate-400">No (Subscription only)</td>
-                  <td className="py-3.5 px-3 text-slate-400">No (Subscription only)</td>
+                  <td className="py-3.5 px-3 font-semibold">Annual Billing Discount</td>
+                  <td className="py-3.5 px-3 text-emerald-600 font-bold">Save up to 40% (2 mo free)</td>
+                  <td className="py-3.5 px-3 text-slate-400">None (Full price)</td>
+                  <td className="py-3.5 px-3 text-slate-400">Multi-year lock-in required</td>
                 </tr>
                 <tr>
                   <td className="py-3.5 px-3 font-semibold">Corner Chair Toggling</td>
@@ -568,7 +564,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
                 </tr>
                 <tr>
                   <td className="py-3.5 px-3 font-semibold">Real-Time Team Sync</td>
-                  <td className="py-3.5 px-3 text-emerald-600 font-bold">Included in Pro</td>
+                  <td className="py-3.5 px-3 text-emerald-600 font-bold">Included in Pro/Planner</td>
                   <td className="py-3.5 px-3 text-slate-400">Desktop files via email</td>
                   <td className="py-3.5 px-3 text-slate-400">Extra $25/user/mo</td>
                 </tr>
@@ -594,30 +590,30 @@ export const PricingPage: React.FC<PricingPageProps> = ({
       <section className="max-w-3xl mx-auto px-4 mt-16 space-y-6">
         <div className="text-center space-y-1.5">
           <h2 className="text-2xl font-black text-slate-900">Frequently Asked Questions</h2>
-          <p className="text-xs text-slate-500">Everything you need to know about our super cheap rates.</p>
+          <p className="text-xs text-slate-500">Everything you need to know about Floordone plans and billing.</p>
         </div>
 
         <div className="space-y-3">
           {[
             {
-              q: 'Why are Floordone prices so ridiculously cheap?',
-              a: 'Floordone was designed from the ground up to run directly in your browser with SVG and WebSockets. We do not have high cloud compute rendering overhead, and we don’t pay enterprise sales teams. We pass every cent of efficiency back to independent restaurateurs, wedding coordinators, and hospitality heroes.'
+              q: 'What is included in the Planner / Pro plan?',
+              a: 'The Planner plan ($24/mo billed annually or $29/mo monthly) unlocks unlimited floor plans, 1 included editor seat, live multiplayer co-editing with real-time cursors, high-res vector PDF exports with seating manifests, unbranded 3D walkthroughs, and dynamic capacity calculators.'
             },
             {
-              q: 'How does the Lifetime Founder pass work?',
-              a: 'You pay $9.99 once, and your account receives all current and future Pro features with no recurring charges ever. It is ideal for independent consultants or venue owners who hate recurring monthly fees.'
+              q: 'When should I upgrade to Venue / Studio?',
+              a: 'Venue / Studio ($65/mo billed annually or $79/mo monthly) is built for venues and multi-room spaces. It includes 3 editor seats, reusable master templates to lock architectural boundaries, multi-room layouts, 3D guest sightline checks, lighting toggles, and embeddable 3D interactive iframes.'
             },
             {
-              q: 'Can I cancel my subscription at any time?',
-              a: 'Yes, with zero friction. You can switch back to the Free Starter plan whenever you like. Your existing floor plans remain stored and safe in your account.'
+              q: 'Can I cancel or change my subscription at any time?',
+              a: 'Yes, with zero friction. You can switch plans or revert back to the Free Starter plan whenever you like. Your existing floor plans remain stored and safe in your workspace.'
             },
             {
               q: 'Are there any limits on the number of tables or chairs I can draw?',
-              a: 'On all paid plans (Solo, Pro, Lifetime), there are zero limits on tables, chairs, walls, doors, or covers. Design massive 500-seat banquets or cozy 10-table bistros freely.'
+              a: 'The Free Starter plan includes up to 30 tables and chairs. On all paid plans (Planner, Venue, Enterprise), there are zero limits on tables, chairs, walls, doors, or covers. Design massive 500-seat banquets or cozy 10-table bistros freely.'
             },
             {
               q: 'Do you offer a money-back guarantee?',
-              a: 'Yes, 100% money-back guarantee within 30 days. If Floordone isn’t the fastest floor plan designer you’ve used, just send us an email for a prompt refund.'
+              a: 'Yes, 100% money-back guarantee within 30 days. If Floordone isn’t the fastest floor plan designer you’ve used, just contact us for a prompt refund.'
             }
           ].map((item, idx) => (
             <div key={idx} className="p-4 rounded-xl bg-white border border-slate-200 space-y-1">
@@ -716,7 +712,7 @@ export const PricingPage: React.FC<PricingPageProps> = ({
             Ready to design your venue with complete precision?
           </h2>
           <p className="text-slate-400 text-xs sm:text-sm max-w-xl mx-auto">
-            Try the Free Starter plan right now, or jump straight into Solo for just $1.19/month.
+            Try the Free Starter plan right now, or upgrade to Planner / Pro from just $24/month.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button

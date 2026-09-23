@@ -199,6 +199,11 @@ export const Canvas: React.FC<CanvasProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
 
+  // Mobile pinch-to-zoom pointer tracking
+  const activePointersRef = useRef<Map<number, { clientX: number; clientY: number }>>(new Map());
+  const pinchStartDistRef = useRef<number | null>(null);
+  const pinchStartZoomRef = useRef<number>(1);
+
   // Dragging / rotating an element
   const [draggedElementId, setDraggedElementId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -441,6 +446,23 @@ export const Canvas: React.FC<CanvasProps> = ({
 
   // Pointer Move on Canvas
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (activePointersRef.current.has(e.pointerId)) {
+      activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+    }
+
+    // Two-finger pinch-to-zoom calculation
+    if (activePointersRef.current.size === 2 && pinchStartDistRef.current) {
+      const pts: { clientX: number; clientY: number }[] = [];
+      activePointersRef.current.forEach((val) => pts.push(val));
+      if (pts.length >= 2) {
+        const currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        const ratio = currentDist / pinchStartDistRef.current;
+        const nextZoom = Math.max(0.25, Math.min(2.5, pinchStartZoomRef.current * ratio));
+        setZoom(nextZoom);
+        return;
+      }
+    }
+
     const coords = clientToCanvasCoords(e.clientX, e.clientY);
     onCursorMove(coords.x, coords.y);
 
@@ -573,7 +595,13 @@ export const Canvas: React.FC<CanvasProps> = ({
     }
   };
 
-  const handlePointerUp = () => {
+  const handlePointerUp = (e?: React.PointerEvent) => {
+    if (e) {
+      activePointersRef.current.delete(e.pointerId);
+      if (activePointersRef.current.size < 2) {
+        pinchStartDistRef.current = null;
+      }
+    }
     if (floorResize) {
       if (
         onUpdateFloorPlan &&
@@ -637,6 +665,18 @@ export const Canvas: React.FC<CanvasProps> = ({
   const handleCanvasBackgroundPointerDown = (e: React.PointerEvent) => {
     if (e.button === 2) return; // ignore right-click
 
+    activePointersRef.current.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+    if (activePointersRef.current.size === 2) {
+      const pts: { clientX: number; clientY: number }[] = [];
+      activePointersRef.current.forEach((val) => pts.push(val));
+      if (pts.length >= 2) {
+        pinchStartDistRef.current = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        pinchStartZoomRef.current = zoom;
+        setIsPanning(false);
+        return;
+      }
+    }
+
     onSelectElement(null);
     // Pan canvas
     setIsPanning(true);
@@ -646,13 +686,40 @@ export const Canvas: React.FC<CanvasProps> = ({
     });
   };
 
+  // Fit Room To Screen (responsive auto-fit)
+  const handleFitToScreen = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const pad = rect.width < 768 ? 20 : 60;
+    const availW = Math.max(120, rect.width - pad * 2);
+    const availH = Math.max(120, rect.height - pad * 2);
+
+    const sX = availW / roomWidthPx;
+    const sY = availH / roomHeightPx;
+    const newZ = Math.max(0.25, Math.min(1.4, Math.min(sX, sY)));
+
+    const cX = Math.max(10, (rect.width - roomWidthPx * newZ) / 2);
+    const cY = Math.max(10, (rect.height - roomHeightPx * newZ) / 2);
+
+    setZoom(newZ);
+    setPan({ x: cX, y: cY });
+  }, [roomWidthPx, roomHeightPx]);
+
+  // Initial fit on mobile/tablet mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        handleFitToScreen();
+      }
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [handleFitToScreen]);
+
   // Zoom helpers
   const handleZoomIn = () => setZoom((z) => Math.min(2.2, z + 0.15));
   const handleZoomOut = () => setZoom((z) => Math.max(0.4, z - 0.15));
-  const handleResetZoom = () => {
-    setZoom(1);
-    setPan({ x: 80, y: 40 });
-  };
+  const handleResetZoom = () => handleFitToScreen();
 
   // Quick cover adjustments
   const handleCoverDelta = (delta: number) => {
@@ -783,9 +850,11 @@ export const Canvas: React.FC<CanvasProps> = ({
       onWheel={handleWheel}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       onPointerDown={handleCanvasBackgroundPointerDown}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
+      style={{ touchAction: 'none' }}
       className={`relative flex-1 h-full w-full bg-slate-100/90 overflow-hidden select-none ${
         isPanning
           ? 'cursor-grabbing'
@@ -795,9 +864,9 @@ export const Canvas: React.FC<CanvasProps> = ({
       }`}
     >
       {/* Floating Canvas Controls: Tool Switcher & Zoom */}
-      <div className="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/95 backdrop-blur-xs p-1.5 rounded-xl shadow-md border border-slate-200">
+      <div className="absolute top-2.5 right-2.5 sm:top-4 sm:right-4 z-20 flex items-center gap-1 sm:gap-1.5 bg-white/95 backdrop-blur-xs p-1 sm:p-1.5 rounded-xl shadow-md border border-slate-200 text-xs">
         {/* Tool Mode: Select vs Pan */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg mr-1">
+        <div className="flex items-center bg-slate-100 p-0.5 rounded-lg mr-0.5 sm:mr-1">
           <button
             id="btn-tool-select"
             onClick={() => setActiveTool('select')}
@@ -826,13 +895,13 @@ export const Canvas: React.FC<CanvasProps> = ({
           </button>
         </div>
 
-        <div className="h-4 w-px bg-slate-200 mx-0.5" />
+        <div className="hidden sm:block h-4 w-px bg-slate-200 mx-0.5" />
 
         {/* 3D Mode Toggle Button */}
         <button
           id="btn-toggle-3d-mode"
           onClick={() => setIs3DMode(true)}
-          className="px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-xs hover:from-indigo-700 hover:to-indigo-800 active:scale-95"
+          className="hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold items-center gap-1.5 transition cursor-pointer bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-xs hover:from-indigo-700 hover:to-indigo-800 active:scale-95"
           title="Switch to 3D Venue Mode (Interactive 3D Walkthrough & Render)"
         >
           <Box className="w-3.5 h-3.5 text-indigo-200" />
@@ -849,7 +918,7 @@ export const Canvas: React.FC<CanvasProps> = ({
               setPaywallFeature('SEATING_CAPACITY_CALCULATOR');
             }
           }}
-          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+          className={`hidden sm:flex px-2.5 py-1.5 rounded-lg text-xs font-bold items-center gap-1.5 transition cursor-pointer ${
             isCalculatorOpen
               ? 'bg-indigo-100 text-indigo-800 border border-indigo-200 shadow-2xs'
               : 'text-slate-700 hover:bg-slate-100'
@@ -867,7 +936,7 @@ export const Canvas: React.FC<CanvasProps> = ({
         <button
           id="btn-pin-comment"
           onClick={() => setIsPlacingComment((prev) => !prev)}
-          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+          className={`hidden md:flex px-2.5 py-1.5 rounded-lg text-xs font-bold items-center gap-1.5 transition cursor-pointer ${
             isPlacingComment
               ? 'bg-amber-500 text-white shadow-2xs'
               : 'text-slate-700 hover:bg-slate-100'
@@ -891,9 +960,9 @@ export const Canvas: React.FC<CanvasProps> = ({
           title="Zoom In"
           className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
-        <span className="text-xs font-semibold text-slate-600 px-1 min-w-[40px] text-center">
+        <span className="text-xs font-semibold text-slate-600 px-0.5 sm:px-1 min-w-[32px] sm:min-w-[40px] text-center">
           {Math.round(zoom * 100)}%
         </span>
         <button
@@ -902,16 +971,16 @@ export const Canvas: React.FC<CanvasProps> = ({
           title="Zoom Out"
           className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
         <div className="h-4 w-px bg-slate-200 mx-0.5" />
         <button
           id="btn-zoom-fit"
-          onClick={handleResetZoom}
-          title="Reset View (100%)"
+          onClick={handleFitToScreen}
+          title="Fit Floor Plan to Screen"
           className="p-1.5 rounded-lg text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition"
         >
-          <Maximize2 className="w-4 h-4" />
+          <Maximize2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600" />
         </button>
       </div>
 
@@ -1548,6 +1617,96 @@ export const Canvas: React.FC<CanvasProps> = ({
                       fill="#cbd5e1"
                       stroke="#64748b"
                       strokeWidth="1.5"
+                    />
+                  </g>
+                ) : el.subtype?.startsWith('sofa') ? (
+                  <g>
+                    {/* Sofa main body */}
+                    <rect
+                      x={-el.width / 2}
+                      y={-el.height / 2}
+                      width={el.width}
+                      height={el.height}
+                      rx="6"
+                      fill={el.color || '#e0e7ff'}
+                      stroke={isSelected ? '#4f46e5' : '#6366f1'}
+                      strokeWidth={isSelected ? 3 : 2}
+                    />
+                    {/* Sofa backrest */}
+                    <rect
+                      x={-el.width / 2 + 3}
+                      y={-el.height / 2 + 2}
+                      width={el.width - 6}
+                      height="8"
+                      rx="3"
+                      fill="#c7d2fe"
+                      stroke="#4f46e5"
+                      strokeWidth="1"
+                    />
+                    {/* Left armrest */}
+                    <rect
+                      x={-el.width / 2 + 2}
+                      y={-el.height / 2 + 2}
+                      width="7"
+                      height={el.height - 4}
+                      rx="3"
+                      fill="#c7d2fe"
+                      stroke="#4f46e5"
+                      strokeWidth="1"
+                    />
+                    {/* Right armrest */}
+                    <rect
+                      x={el.width / 2 - 9}
+                      y={-el.height / 2 + 2}
+                      width="7"
+                      height={el.height - 4}
+                      rx="3"
+                      fill="#c7d2fe"
+                      stroke="#4f46e5"
+                      strokeWidth="1"
+                    />
+                  </g>
+                ) : el.subtype === 'chair-barstool' ? (
+                  <g>
+                    <circle
+                      cx="0"
+                      cy="0"
+                      r={el.width / 2}
+                      fill="#f1f5f9"
+                      stroke={isSelected ? '#4f46e5' : '#94a3b8'}
+                      strokeWidth="1.5"
+                    />
+                    <circle
+                      cx="0"
+                      cy="0"
+                      r={Math.max(4, el.width / 2 - 3)}
+                      fill={el.color || '#e0e7ff'}
+                      stroke={isSelected ? '#4f46e5' : '#6366f1'}
+                      strokeWidth={isSelected ? 2.5 : 1.5}
+                    />
+                    <circle cx="0" cy="0" r="2" fill="#4f46e5" />
+                  </g>
+                ) : el.type === 'chair' ? (
+                  <g>
+                    <rect
+                      x={-el.width / 2}
+                      y={-el.height / 2}
+                      width={el.width}
+                      height={el.height}
+                      rx="4"
+                      fill={el.color || '#e0e7ff'}
+                      stroke={isSelected ? '#4f46e5' : '#6366f1'}
+                      strokeWidth={isSelected ? 3 : 2}
+                    />
+                    <rect
+                      x={-el.width / 2 + 2}
+                      y={-el.height / 2 + 2}
+                      width={el.width - 4}
+                      height="5"
+                      rx="2"
+                      fill="#c7d2fe"
+                      stroke="#4f46e5"
+                      strokeWidth="1"
                     />
                   </g>
                 ) : el.name === 'Dance Floor' ? (

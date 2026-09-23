@@ -22,10 +22,14 @@ import {
   Utensils,
   Tag,
   Crown,
-  Lock
+  Lock,
+  Building2,
+  Flame,
+  Check
 } from 'lucide-react';
 import { FloordoneLogo } from './FloordoneLogo';
 import { ROOM_TEMPLATES } from '../data/roomTemplates';
+import { PLAN_TIERS } from '../utils/entitlements';
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -114,11 +118,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <a href="#templates" className="hover:text-slate-900 transition">
               Templates
             </a>
-            <a href="#pricing" className="hover:text-slate-900 transition flex items-center gap-1 text-emerald-600 font-bold">
+            <a href="#pricing" className="hover:text-slate-900 transition flex items-center gap-1 text-slate-600 font-semibold">
               Pricing
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
-                $1.19
-              </span>
             </a>
             <a href="#testimonials" className="hover:text-slate-900 transition">
               Reviews
@@ -851,24 +852,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <section id="pricing" className="py-20 bg-slate-50 border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300 shadow-2xs">
-              <Tag className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Pocket-Friendly Micro Pricing</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-800 text-xs font-bold border border-indigo-200 shadow-2xs">
+              <Tag className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Transparent & Predictable Pricing</span>
             </div>
             <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
-              Hospitality Grade Software at Everyday Prices
+              Professional Floor Planning at Honest Prices
             </h2>
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              No contracts. No per-seat extortion. Plans start at less than a single morning coffee, or grab the one-time Lifetime deal and never pay a subscription again.
+              No hidden fees, no per-table gouging, and no lengthy contracts. Save with annual billing, or pay month-to-month. Cancel anytime in one click.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch">
-            {/* Free */}
+            {/* 1. Free Starter */}
             <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-xs flex flex-col justify-between">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-slate-900 text-base">Starter Free</h3>
+                  <h3 className="font-extrabold text-slate-900 text-base">{PLAN_TIERS.free.name}</h3>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600">Free</span>
                 </div>
                 <div className="flex items-baseline gap-1">
@@ -876,86 +877,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span className="text-xs text-slate-500 font-semibold">/ forever</span>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Best for quick table sketches and occasional dining arrangements.
+                  {PLAN_TIERS.free.tagline}
                 </p>
                 <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                  <li className="flex items-center gap-2">✓ 1 Active floor plan</li>
-                  <li className="flex items-center gap-2">✓ Up to 30 tables & chairs</li>
-                  <li className="flex items-center gap-2">✓ Corner chair removal</li>
-                  <li className="flex items-center gap-2">✓ Standard SVG/PNG exports</li>
+                  {PLAN_TIERS.free.bulletPoints.map((pt, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{pt}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
               <button
                 onClick={onGetStarted}
                 className="mt-6 w-full py-2.5 rounded-xl border border-slate-300 text-slate-800 text-xs font-bold hover:bg-slate-50 transition"
               >
-                Start Free
+                Start Free Forever
               </button>
             </div>
 
-            {/* Solo Host */}
-            <div className="bg-white rounded-2xl p-6 border border-emerald-300 shadow-sm flex flex-col justify-between relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
-                  ⚡ CHEAPEST PRO
-                </span>
-              </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-slate-900 text-base">Solo Host</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Recommended</span>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-emerald-700">$1.19</span>
-                  <span className="text-xs text-slate-500 font-semibold">/ mo (billed yearly)</span>
-                </div>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Ideal for single restaurants, cafes, pop-ups, and private dining rooms.
-                </p>
-                <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                  <li className="flex items-center gap-2">✓ <strong>Unlimited</strong> floor plans</li>
-                  <li className="flex items-center gap-2">✓ All walls, doors & decks</li>
-                  <li className="flex items-center gap-2">✓ Botanical plants & decor</li>
-                  <li className="flex items-center gap-2">✓ High-res vector PDF export</li>
-                  <li className="flex items-center gap-2">✓ Guest seating manifest</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => {
-                  if (onOpenPricing) onOpenPricing();
-                  else onGetStarted();
-                }}
-                className="mt-6 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
-              >
-                Upgrade to Solo ($1.19)
-              </button>
-            </div>
-
-            {/* Pro Studio */}
+            {/* 2. Planner / Pro */}
             <div className="bg-white rounded-2xl p-6 border-2 border-indigo-600 shadow-lg flex flex-col justify-between relative md:-translate-y-1">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-indigo-600 text-white shadow-xs">
-                  🔥 MOST POPULAR
+                  ⚡ MOST POPULAR
                 </span>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-slate-900 text-base">Pro Studio</h3>
+                  <h3 className="font-extrabold text-slate-900 text-base">{PLAN_TIERS.planner.name}</h3>
                   <Crown className="w-4 h-4 text-indigo-600" />
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-indigo-600">$2.49</span>
+                  <span className="text-3xl font-black text-indigo-600">${PLAN_TIERS.planner.annualMonthlyPrice}</span>
                   <span className="text-xs text-slate-500 font-semibold">/ mo (billed yearly)</span>
                 </div>
+                <p className="text-[11px] text-slate-400 font-medium -mt-2">
+                  or ${PLAN_TIERS.planner.monthlyPrice}/mo monthly
+                </p>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  For thriving venues, wedding coordinators, and hospitality teams.
+                  {PLAN_TIERS.planner.tagline}
                 </p>
                 <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                  <li className="flex items-center gap-2">✓ <strong>Everything in Solo</strong></li>
-                  <li className="flex items-center gap-2">✓ Live team multiplayer cursors</li>
-                  <li className="flex items-center gap-2">✓ Custom venue logo on PDFs</li>
-                  <li className="flex items-center gap-2">✓ Table status reservations sync</li>
-                  <li className="flex items-center gap-2">✓ Unlimited revisions & history</li>
+                  {PLAN_TIERS.planner.bulletPoints.map((pt, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                      <span>{pt}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
               <button
@@ -965,34 +934,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 }}
                 className="mt-6 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black transition shadow-md"
               >
-                Upgrade to Pro ($2.49)
+                Upgrade to Planner (${PLAN_TIERS.planner.annualMonthlyPrice}/mo)
               </button>
             </div>
 
-            {/* Lifetime */}
-            <div className="bg-gradient-to-b from-amber-50/60 to-white rounded-2xl p-6 border border-amber-300 shadow-md flex flex-col justify-between relative">
+            {/* 3. Venue / Studio */}
+            <div className="bg-white rounded-2xl p-6 border border-emerald-300 shadow-sm flex flex-col justify-between relative">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-200 text-amber-900 border border-amber-300 shadow-2xs">
-                  ⭐ LIFETIME DEAL
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                  🏆 VENUE CHOICE
                 </span>
               </div>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-extrabold text-slate-900 text-base">Lifetime Pass</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800">One-Time</span>
+                  <h3 className="font-extrabold text-slate-900 text-base">{PLAN_TIERS.venue.name}</h3>
+                  <Building2 className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-slate-900">$9.99</span>
-                  <span className="text-xs text-slate-500 font-semibold">one-time payment</span>
+                  <span className="text-3xl font-black text-emerald-700">${PLAN_TIERS.venue.annualMonthlyPrice}</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ mo (billed yearly)</span>
                 </div>
+                <p className="text-[11px] text-slate-400 font-medium -mt-2">
+                  or ${PLAN_TIERS.venue.monthlyPrice}/mo monthly
+                </p>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  Pay once, use forever. No recurring monthly or annual billing.
+                  {PLAN_TIERS.venue.tagline}
                 </p>
                 <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
-                  <li className="flex items-center gap-2">✓ All Pro features unlocked</li>
-                  <li className="flex items-center gap-2">✓ Lifetime free updates</li>
-                  <li className="flex items-center gap-2">✓ No recurring charges ever</li>
-                  <li className="flex items-center gap-2">✓ VIP Founder badge</li>
+                  {PLAN_TIERS.venue.bulletPoints.map((pt, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{pt}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
               <button
@@ -1000,9 +974,51 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   if (onOpenPricing) onOpenPricing();
                   else onGetStarted();
                 }}
-                className="mt-6 w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black transition shadow-md"
+                className="mt-6 w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-xs"
               >
-                Get Lifetime Pass ($9.99)
+                Upgrade to Venue (${PLAN_TIERS.venue.annualMonthlyPrice}/mo)
+              </button>
+            </div>
+
+            {/* 4. Business / Enterprise */}
+            <div className="bg-white rounded-2xl p-6 border border-amber-300 shadow-sm flex flex-col justify-between relative">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                  👑 ENTERPRISE
+                </span>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-slate-900 text-base">{PLAN_TIERS.enterprise.name}</h3>
+                  <Flame className="w-4 h-4 text-amber-600" />
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-black text-amber-700">${PLAN_TIERS.enterprise.annualMonthlyPrice}</span>
+                  <span className="text-xs text-slate-500 font-semibold">/ mo (billed yearly)</span>
+                </div>
+                <p className="text-[11px] text-slate-400 font-medium -mt-2">
+                  or ${PLAN_TIERS.enterprise.monthlyPrice}/mo monthly
+                </p>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {PLAN_TIERS.enterprise.tagline}
+                </p>
+                <ul className="space-y-2 text-xs text-slate-700 pt-2 border-t border-slate-100">
+                  {PLAN_TIERS.enterprise.bulletPoints.map((pt, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                      <span>{pt}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button
+                onClick={() => {
+                  if (onOpenPricing) onOpenPricing();
+                  else onGetStarted();
+                }}
+                className="mt-6 w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition shadow-xs"
+              >
+                Contact Enterprise (${PLAN_TIERS.enterprise.annualMonthlyPrice}/mo)
               </button>
             </div>
           </div>
@@ -1128,9 +1144,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   onOpenPricing();
                 }
               }}
-              className="hover:text-emerald-400 text-emerald-500 font-bold transition flex items-center gap-1"
+              className="hover:text-white text-slate-300 transition"
             >
-              Pricing ($1.19/mo)
+              Pricing & Plans
             </a>
             <a
               href="#roi-calculator"

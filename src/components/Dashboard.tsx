@@ -32,6 +32,7 @@ interface DashboardProps {
   onOpenTemplates: () => void;
   onBackToEditor?: () => void;
   onOpenPricing?: () => void;
+  onSaveCurrentPlan?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -44,11 +45,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
   isSyncing,
   onOpenTemplates,
   onBackToEditor,
-  onOpenPricing
+  onOpenPricing,
+  onSaveCurrentPlan
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [venueFilter, setVenueFilter] = useState('all');
   const [showNewModal, setShowNewModal] = useState(false);
+  const [savedFeedback, setSavedFeedback] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<ProjectSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteProject(projectToDelete.id);
+    } catch (err) {
+      console.error('Delete project failed:', err);
+    } finally {
+      setIsDeleting(false);
+      setProjectToDelete(null);
+    }
+  };
 
   const filteredProjects = projects.filter((proj) => {
     const matchesSearch =
@@ -61,9 +79,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const totalCapacity = projects.reduce((sum, p) => sum + (p.totalCovers || 0), 0);
   const totalTables = projects.reduce((sum, p) => sum + (p.tableCount || 0), 0);
 
+  const handleSaveActive = () => {
+    if (onSaveCurrentPlan) {
+      onSaveCurrentPlan();
+      setSavedFeedback(true);
+      setTimeout(() => setSavedFeedback(false), 2500);
+    }
+  };
+
   return (
-    <div id="projects-dashboard" className="flex-1 h-full overflow-y-auto bg-slate-50/80 p-6 lg:p-10 select-none">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div id="projects-dashboard" className="flex-1 h-full overflow-y-auto bg-slate-50/80 p-3.5 sm:p-6 lg:p-10 select-none">
+      <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8">
         {/* Header & Stats Banner */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
@@ -71,22 +97,38 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div>
               <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider">
                 <CloudCheck className="w-4 h-4 text-emerald-600" />
-                Cloud Synchronized Workspace
+                Cloud & Local Synchronized
               </div>
               <h1 className="text-2xl lg:text-3xl font-extrabold text-slate-900 mt-0.5">
                 Floor Plan Projects
               </h1>
-              <p className="text-slate-500 text-sm mt-0.5">
-                Manage multi-room layouts, seating arrangements, and live team plans with Floordone.
+              <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+                Manage multi-room layouts, seating arrangements, and live team plans.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {onSaveCurrentPlan && (
+              <button
+                id="btn-dashboard-save-active"
+                onClick={handleSaveActive}
+                className={`px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 shadow-2xs ${
+                  savedFeedback
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
+                }`}
+                title="Save current active layout to Projects list"
+              >
+                <CloudCheck className="w-4 h-4 text-emerald-600" />
+                <span>{savedFeedback ? 'Saved Active ✓' : 'Save Active Plan'}</span>
+              </button>
+            )}
+
             {onOpenPricing && (
               <button
                 onClick={onOpenPricing}
-                className="px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition flex items-center gap-1.5"
+                className="px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition flex items-center gap-1.5"
               >
                 <Tag className="w-4 h-4 text-emerald-600" />
                 <span>Pricing</span>
@@ -97,34 +139,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
               id="btn-dashboard-refresh"
               onClick={onRefreshProjects}
               title="Sync with cloud"
-              className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5 text-xs font-semibold"
+              className="p-2 sm:p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5 text-xs font-semibold"
             >
               <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-indigo-600' : ''}`} />
-              <span className="hidden sm:inline">Sync Cloud</span>
+              <span className="hidden sm:inline">Sync</span>
             </button>
 
             <button
               id="btn-dashboard-templates"
               onClick={onOpenTemplates}
-              className="px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5"
+              className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition flex items-center gap-1.5"
             >
               <Sparkles className="w-4 h-4 text-amber-600" />
-              Browse Templates
+              <span className="hidden xs:inline">Templates</span>
             </button>
 
             <button
               id="btn-dashboard-new-project"
               onClick={() => setShowNewModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-1.5"
+              className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-md hover:shadow-lg transition flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              New Floor Plan
+              New Plan
             </button>
 
             {onBackToEditor && (
               <button
                 onClick={onBackToEditor}
-                className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
+                className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-bold transition flex items-center gap-1.5 shadow-2xs"
               >
                 <span>Designer</span>
                 <ArrowRight className="w-4 h-4" />
@@ -266,31 +308,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     {new Date(proj.updatedAt).toLocaleDateString()}
                   </span>
 
-                  <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1">
                     <button
                       id={`btn-dup-${proj.id}`}
-                      onClick={() => onDuplicateProject(proj.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDuplicateProject(proj.id);
+                      }}
                       title="Duplicate project"
-                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition cursor-pointer"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                     <button
                       id={`btn-del-${proj.id}`}
-                      onClick={() => {
-                        if (window.confirm(`Delete "${proj.name}"? This cannot be undone.`)) {
-                          onDeleteProject(proj.id);
-                        }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProjectToDelete(proj);
                       }}
                       title="Delete project"
-                      className="p-1.5 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition"
+                      className="p-1.5 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                     <button
                       id={`btn-open-${proj.id}`}
                       onClick={() => onOpenProject(proj.id)}
-                      className="ml-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1"
+                      className="ml-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-xs transition flex items-center gap-1 cursor-pointer"
                     >
                       Open
                       <ExternalLink className="w-3 h-3" />
@@ -318,6 +362,53 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Project Confirmation Modal (Iframe & Mobile Compatible) */}
+      {projectToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-12 h-12 rounded-full bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">Delete Project?</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Are you sure you want to delete <span className="font-semibold text-slate-800">"{projectToDelete.name}"</span>? This will permanently remove this floor plan layout.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                id="btn-cancel-delete"
+                onClick={() => setProjectToDelete(null)}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                id="btn-confirm-delete"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Project Modal (Start Blank or Template) */}
       <NewPlanModal

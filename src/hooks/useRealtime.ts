@@ -11,7 +11,7 @@ interface UseRealtimeProps {
   onRemoteRoomSync: (project: FloorPlan) => void;
 }
 
-const AVATAR_OPTIONS = ['👨‍🍳', '👩‍💼', '🤵', '🥂', '📋', '🎨', '💼'];
+const AVATAR_OPTIONS = ['👨‍🍳', '👩‍💼', '🤵', '🥂', '📋', '🎨', '💼', '👩‍💻', '👨‍💼'];
 const COLOR_OPTIONS = [
   '#3b82f6', // blue
   '#10b981', // emerald
@@ -19,7 +19,48 @@ const COLOR_OPTIONS = [
   '#f59e0b', // amber
   '#ec4899', // pink
   '#06b6d4', // cyan
+  '#ef4444', // red
+  '#6366f1', // indigo
 ];
+
+function getSessionUserId(): string {
+  try {
+    let id = sessionStorage.getItem('fp_session_user_id');
+    if (!id) {
+      id = `usr-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+      sessionStorage.setItem('fp_session_user_id', id);
+    }
+    return id;
+  } catch {
+    return `usr-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+  }
+}
+
+function getSessionColor(): string {
+  try {
+    let col = sessionStorage.getItem('fp_session_color');
+    if (!col) {
+      col = COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
+      sessionStorage.setItem('fp_session_color', col);
+    }
+    return col;
+  } catch {
+    return COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
+  }
+}
+
+function getSessionAvatar(): string {
+  try {
+    let av = sessionStorage.getItem('fp_session_avatar');
+    if (!av) {
+      av = AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
+      sessionStorage.setItem('fp_session_avatar', av);
+    }
+    return av;
+  } catch {
+    return AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
+  }
+}
 
 export function useRealtime({
   projectId,
@@ -31,17 +72,17 @@ export function useRealtime({
   onRemoteRoomSync
 }: UseRealtimeProps) {
   const [currentUser, setCurrentUser] = useState<Collaborator>(() => {
-    const savedName = localStorage.getItem('fp_user_name') || 'You (Designer)';
-    const savedColor = localStorage.getItem('fp_user_color') || COLOR_OPTIONS[Math.floor(Math.random() * COLOR_OPTIONS.length)];
-    const savedAvatar = localStorage.getItem('fp_user_avatar') || AVATAR_OPTIONS[Math.floor(Math.random() * AVATAR_OPTIONS.length)];
-    const id = localStorage.getItem('fp_user_id') || `usr-${Math.random().toString(36).substring(2, 7)}`;
-    localStorage.setItem('fp_user_id', id);
+    const id = getSessionUserId();
+    const savedName = localStorage.getItem('fp_user_name');
+    const name = savedName ? `${savedName} (${id.slice(-4)})` : `Designer (${id.slice(-4)})`;
+    const color = getSessionColor();
+    const avatar = getSessionAvatar();
 
     return {
       id,
-      name: savedName,
-      color: savedColor,
-      avatar: savedAvatar,
+      name,
+      color,
+      avatar,
       role: userRole
     };
   });
@@ -55,12 +96,13 @@ export function useRealtime({
         socketRef.current.send(JSON.stringify({
           type: 'join',
           projectId,
-          user: updated
+          user: updated,
+          project: floorPlan
         }));
       }
       return updated;
     });
-  }, [userRole, projectId]);
+  }, [userRole, projectId, floorPlan]);
 
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
@@ -75,8 +117,20 @@ export function useRealtime({
     setCurrentUser((prev) => {
       const updated = { ...prev, ...updates };
       if (updates.name) localStorage.setItem('fp_user_name', updates.name);
-      if (updates.color) localStorage.setItem('fp_user_color', updates.color);
-      if (updates.avatar) localStorage.setItem('fp_user_avatar', updates.avatar);
+      if (updates.color) {
+        try { sessionStorage.setItem('fp_session_color', updates.color); } catch {}
+      }
+      if (updates.avatar) {
+        try { sessionStorage.setItem('fp_session_avatar', updates.avatar); } catch {}
+      }
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({
+          type: 'join',
+          projectId,
+          user: updated,
+          project: floorPlan
+        }));
+      }
       return updated;
     });
   };
@@ -98,11 +152,12 @@ export function useRealtime({
       ws.onopen = () => {
         if (!isMounted) return;
         setConnectionStatus('connected');
-        // Send join packet
+        // Send join packet with initial project if present
         ws.send(JSON.stringify({
           type: 'join',
           projectId,
-          user: currentUser
+          user: currentUser,
+          project: floorPlan
         }));
       };
 
@@ -112,7 +167,15 @@ export function useRealtime({
           const msg = JSON.parse(event.data);
 
           switch (msg.type) {
-            case 'joined':
+            case 'joined': {
+              const remoteUsers = (msg.users || []).filter((u: Collaborator) => u.id !== currentUser.id);
+              setCollaborators(remoteUsers);
+              if (msg.project && floorPlan.elements.length === 0 && (msg.project.elements || []).length > 0) {
+                onRemoteRoomSync(msg.project);
+              }
+              break;
+            }
+
             case 'presence': {
               const remoteUsers = (msg.users || []).filter((u: Collaborator) => u.id !== currentUser.id);
               setCollaborators(remoteUsers);
@@ -120,20 +183,50 @@ export function useRealtime({
             }
 
             case 'cursor': {
-              setCollaborators((prev) =>
-                prev.map((c) =>
-                  c.id === msg.userId ? { ...c, cursor: { x: msg.x, y: msg.y } } : c
-                )
-              );
+              if (msg.userId === currentUser.id) return;
+              setCollaborators((prev) => {
+                const existing = prev.find((c) => c.id === msg.userId);
+                if (existing) {
+                  return prev.map((c) =>
+                    c.id === msg.userId ? { ...c, cursor: { x: msg.x, y: msg.y } } : c
+                  );
+                }
+                return [
+                  ...prev,
+                  {
+                    id: msg.userId,
+                    name: msg.name || 'Collaborator',
+                    color: msg.color || '#3b82f6',
+                    avatar: '👤',
+                    role: 'editor',
+                    cursor: { x: msg.x, y: msg.y }
+                  }
+                ];
+              });
               break;
             }
 
             case 'selection': {
-              setCollaborators((prev) =>
-                prev.map((c) =>
-                  c.id === msg.userId ? { ...c, selectedElementId: msg.elementId } : c
-                )
-              );
+              if (msg.userId === currentUser.id) return;
+              setCollaborators((prev) => {
+                const existing = prev.find((c) => c.id === msg.userId);
+                if (existing) {
+                  return prev.map((c) =>
+                    c.id === msg.userId ? { ...c, selectedElementId: msg.elementId } : c
+                  );
+                }
+                return [
+                  ...prev,
+                  {
+                    id: msg.userId,
+                    name: msg.name || 'Collaborator',
+                    color: msg.color || '#3b82f6',
+                    avatar: '👤',
+                    role: 'editor',
+                    selectedElementId: msg.elementId
+                  }
+                ];
+              });
               break;
             }
 

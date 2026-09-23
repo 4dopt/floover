@@ -20,6 +20,7 @@ import {
   Filter,
   Layers,
   ChevronRight,
+  ChevronLeft,
   DoorOpen,
   DoorClosed,
   Columns3,
@@ -90,6 +91,9 @@ function getPresetIcon(preset: FurniturePreset) {
     case 'Egg': return <Egg className="w-5 h-5 text-slate-700" />;
     case 'RectangleHorizontal': return <RectangleHorizontal className="w-5 h-5 text-slate-700" />;
     default:
+      if (preset.category === 'seating' || preset.shape === 'booth' || preset.type === 'chair') {
+        return <Armchair className="w-5 h-5 text-indigo-600" />;
+      }
       if (preset.category === 'decor') return <Sprout className="w-5 h-5 text-emerald-600" />;
       if (preset.category === 'outdoor') return <Sun className="w-5 h-5 text-amber-600" />;
       if (preset.category === 'architectural') return <Columns3 className="w-5 h-5 text-slate-700" />;
@@ -114,6 +118,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [activeTab, setActiveTab] = useState<'library' | 'templates' | 'inspector' | 'room'>('library');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   // Templates search & filter
   const [templateSearch, setTemplateSearch] = useState<string>('');
@@ -125,17 +130,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
   React.useEffect(() => {
     if (selectedElementId) {
       setActiveTab('inspector');
+      if (isCollapsed) setIsCollapsed(false);
     }
   }, [selectedElementId]);
 
   // Filtered furniture presets
   const filteredPresets = FURNITURE_PRESETS.filter((item) => {
-    const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+    const isSeating =
+      item.category === 'seating' ||
+      item.shape === 'booth' ||
+      item.type === 'chair';
+
+    const isTables =
+      item.category === 'tables' &&
+      item.shape !== 'booth' &&
+      item.type !== 'chair';
+
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      (selectedCategory === 'seating' && isSeating) ||
+      (selectedCategory === 'tables' && isTables) ||
+      (selectedCategory !== 'seating' && selectedCategory !== 'tables' && item.category === selectedCategory);
+
     const matchesSearch =
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.shape.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesCategory && matchesSearch;
   });
 
@@ -161,8 +183,101 @@ export const Sidebar: React.FC<SidebarProps> = ({
     e.dataTransfer.effectAllowed = 'copy';
   };
 
+  // If collapsed (e.g. on tablet or compact mode)
+  if (isCollapsed) {
+    return (
+      <aside
+        id="app-sidebar-collapsed"
+        className="hidden md:flex w-14 h-full bg-white border-r border-slate-200 flex-col items-center py-3 justify-between shrink-0 select-none z-20"
+      >
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={() => setIsCollapsed(false)}
+            title="Expand Sidebar"
+            className="p-2 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition shadow-2xs"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <div className="w-8 h-px bg-slate-200 my-1" />
+
+          <button
+            onClick={() => {
+              setActiveTab('library');
+              setIsCollapsed(false);
+            }}
+            title="Furniture Library"
+            className={`p-2.5 rounded-xl transition ${
+              activeTab === 'library' ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Armchair className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('templates');
+              setIsCollapsed(false);
+            }}
+            title="Room Templates"
+            className={`p-2.5 rounded-xl transition ${
+              activeTab === 'templates' ? 'bg-amber-500 text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('inspector');
+              setIsCollapsed(false);
+            }}
+            title="Table Inspector"
+            className={`p-2.5 rounded-xl transition relative ${
+              activeTab === 'inspector' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Sliders className="w-4 h-4" />
+            {selectedElement && (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-1 right-1 ring-2 ring-white" />
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('room');
+              setIsCollapsed(false);
+            }}
+            title="Room Setup"
+            className={`p-2.5 rounded-xl transition ${
+              activeTab === 'room' ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="text-[10px] font-bold text-slate-400 rotate-180 [writing-mode:vertical-rl]">
+          FLOORDONE
+        </div>
+      </aside>
+    );
+  }
+
   return (
-    <aside id="app-sidebar" className="w-80 lg:w-88 h-full bg-white border-r border-slate-200 flex flex-col shrink-0 select-none z-20">
+    <aside
+      id="app-sidebar"
+      className="hidden md:flex w-72 lg:w-84 xl:w-88 h-full bg-white border-r border-slate-200 flex-col shrink-0 select-none z-20 relative"
+    >
+      {/* Tablet collapse trigger button */}
+      <button
+        onClick={() => setIsCollapsed(true)}
+        title="Collapse Sidebar"
+        className="absolute -right-3.5 top-3 z-30 w-7 h-7 bg-white border border-slate-200 rounded-full shadow-sm flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition"
+      >
+        <ChevronLeft className="w-3.5 h-3.5" />
+      </button>
+
       {/* Sidebar Top Tab Navigation */}
       <div className="flex border-b border-slate-200 bg-slate-50/70 p-1 gap-1">
         <button
@@ -243,6 +358,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {[
                 { id: 'all', label: 'All Items' },
                 { id: 'tables', label: 'Tables' },
+                { id: 'seating', label: 'Booths & Chairs' },
                 { id: 'architectural', label: 'Walls & Doors' },
                 { id: 'outdoor', label: 'Decks & Patio' },
                 { id: 'decor', label: 'Plants & Decor' },

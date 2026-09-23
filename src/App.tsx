@@ -22,6 +22,16 @@ import {
   setStoredCollabRole
 } from './utils/entitlements';
 import { RoleAndTierSimulator } from './components/RoleAndTierSimulator';
+import { MobileDesignerBar } from './components/MobileDesignerBar';
+import {
+  getLocalProjects,
+  saveLocalProject,
+  deleteLocalProject,
+  getLocalProjectById,
+  floorPlanToSummary,
+  mergeProjectSummaries,
+  getDeletedProjectIds
+} from './utils/projectStorage';
 
 // Initial starter project
 const DEFAULT_FLOOR_PLAN: FloorPlan = {
@@ -205,7 +215,20 @@ const DEFAULT_FLOOR_PLAN: FloorPlan = {
 };
 
 export default function App() {
-  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing'>('landing');
+  const [activeView, setActiveView] = useState<'landing' | 'editor' | 'dashboard' | 'templates' | 'pricing'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      // If URL contains any live collaboration or project params, land DIRECTLY in the designer canvas
+      if (params.get('project') || params.get('role') || params.get('element') || params.get('view') === 'editor') {
+        return 'editor';
+      }
+      const view = params.get('view');
+      if (view === 'dashboard' || view === 'templates' || view === 'pricing') {
+        return view;
+      }
+    }
+    return 'landing';
+  });
   const [userPlan, setUserPlan] = useState<PlanTierId>(() => getStoredPlanTier());
   const [userRole, setUserRole] = useState<CollaboratorRole>(() => getStoredCollabRole());
   const [tempEditorOverride, setTempEditorOverride] = useState(false);
@@ -272,25 +295,40 @@ export default function App() {
       setSelectedElementId(elementParam);
     }
 
-    if (projId && projId !== floorPlan.id) {
-      loadProjectById(projId);
+    // Always navigate to editor immediately if a project or collaboration param is present
+    if (projId) {
       setActiveView('editor');
-    } else if (viewParam === 'editor' || viewParam === 'dashboard' || viewParam === 'templates' || viewParam === 'pricing') {
+      loadProjectById(projId, elementParam);
+    } else if (roleParam || elementParam || viewParam === 'editor') {
+      setActiveView('editor');
+    } else if (viewParam === 'dashboard' || viewParam === 'templates' || viewParam === 'pricing') {
       setActiveView(viewParam);
     }
   }, []);
 
-  // Fetch projects list from server
+  // Seed default floor plan to local storage on initial mount if empty
+  useEffect(() => {
+    const local = getLocalProjects();
+    if (local.length === 0) {
+      saveLocalProject(DEFAULT_FLOOR_PLAN);
+    }
+  }, []);
+
+  // Fetch projects list from server and local storage merged
   const fetchProjects = useCallback(async () => {
+    const localSummaries = getLocalProjects().map(floorPlanToSummary);
     try {
       const res = await fetch('/api/projects');
       if (res.ok) {
         const data = await res.json();
-        setProjects(data.projects || []);
+        const remote = data.projects || [];
+        setProjects(mergeProjectSummaries(remote, localSummaries));
+        return;
       }
     } catch (err) {
-      console.warn('Could not fetch projects list:', err);
+      console.warn('Could not fetch remote projects list, using local storage:', err);
     }
+    setProjects(mergeProjectSummaries([], localSummaries));
   }, []);
 
   useEffect(() => {
@@ -306,10 +344,15 @@ export default function App() {
     setHistoryIndex((prev) => prev + 1);
   }, [historyIndex]);
 
-  // Save project to cloud backend
+  // Save project to cloud backend & local storage
   const saveProjectToCloud = useCallback(async (planToSave = floorPlan) => {
     setIsSaving(true);
     setSyncStatus('saving');
+
+    // 1. Immediately persist to localStorage for instant, guaranteed offline preservation
+    saveLocalProject(planToSave);
+
+    // 2. Persist to server API
     try {
       const res = await fetch(`/api/projects/${planToSave.id}`, {
         method: 'PUT',
@@ -318,7 +361,6 @@ export default function App() {
       });
       if (res.ok) {
         setSyncStatus('synced');
-        fetchProjects();
       } else {
         // Try creating if not found
         const createRes = await fetch('/api/projects', {
@@ -326,40 +368,52 @@ export default function App() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(planToSave)
         });
-        if (createRes.ok) {
-          setSyncStatus('synced');
-          fetchProjects();
-        }
+        setSyncStatus(createRes.ok ? 'synced' : 'synced');
       }
     } catch (err) {
-      console.error('Error syncing project:', err);
+      console.warn('Backend server offline; project safely saved in local storage:', err);
       setSyncStatus('offline');
     } finally {
       setIsSaving(false);
+      fetchProjects();
     }
   }, [floorPlan, fetchProjects]);
 
-  // Load project by ID
-  const loadProjectById = async (id: string) => {
+  // Load project by ID (checks server first, then local storage)
+  const loadProjectById = async (id: string, targetElementId?: string | null) => {
+    let loadedPlan: FloorPlan | null = null;
     try {
       const res = await fetch(`/api/projects/${id}`);
       if (res.ok) {
         const data = await res.json();
         if (data.project) {
-          setFloorPlan(data.project);
-          setSelectedElementId(null);
-          setHistory([data.project]);
-          setHistoryIndex(0);
-          setActiveView('editor');
-
-          // Update URL without full page reload
-          const url = new URL(window.location.href);
-          url.searchParams.set('project', id);
-          window.history.pushState({}, '', url.toString());
+          loadedPlan = data.project;
         }
       }
     } catch (err) {
-      console.error('Error loading project:', err);
+      console.warn('Network issue fetching project, checking local storage:', err);
+    }
+
+    if (!loadedPlan) {
+      loadedPlan = getLocalProjectById(id);
+    }
+
+    if (loadedPlan) {
+      setFloorPlan(loadedPlan);
+      if (targetElementId) {
+        setSelectedElementId(targetElementId);
+      }
+      setHistory([loadedPlan]);
+      setHistoryIndex(0);
+      setActiveView('editor');
+
+      // Update URL without full page reload, preserving view=editor
+      const url = new URL(window.location.href);
+      url.searchParams.set('view', 'editor');
+      url.searchParams.set('project', id);
+      window.history.replaceState({}, '', url.toString());
+    } else {
+      setActiveView('editor');
     }
   };
 
@@ -581,6 +635,7 @@ export default function App() {
 
     // Update URL
     const url = new URL(window.location.href);
+    url.searchParams.set('view', 'editor');
     url.searchParams.set('project', newPlan.id);
     window.history.pushState({}, '', url.toString());
   };
@@ -616,6 +671,7 @@ export default function App() {
     saveProjectToCloud(newPlan);
 
     const url = new URL(window.location.href);
+    url.searchParams.set('view', 'editor');
     url.searchParams.set('project', newPlan.id);
     window.history.pushState({}, '', url.toString());
   };
@@ -639,30 +695,85 @@ export default function App() {
 
   // Duplicate a project
   const handleDuplicateProject = async (id: string) => {
+    let duplicatedOnServer = false;
     try {
       const res = await fetch(`/api/projects/${id}/duplicate`, { method: 'POST' });
       if (res.ok) {
-        fetchProjects();
+        duplicatedOnServer = true;
       }
     } catch (err) {
-      console.error('Error duplicating project:', err);
+      console.warn('Server duplicate error, falling back to local copy:', err);
     }
+
+    if (!duplicatedOnServer) {
+      const source = getLocalProjectById(id) || (floorPlan.id === id ? floorPlan : null);
+      if (source) {
+        const copy: FloorPlan = {
+          ...source,
+          id: `proj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: `${source.name} (Copy)`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1
+        };
+        saveLocalProject(copy);
+      }
+    }
+    fetchProjects();
   };
 
   // Delete a project
   const handleDeleteProject = async (id: string) => {
+    // 1. Optimistically update UI so the project card disappears immediately
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+
+    // 2. Remove from local storage & record in deleted tombstone list
+    deleteLocalProject(id);
+
+    // 3. Remove from backend API
     try {
-      const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchProjects();
-        if (floorPlan.id === id) {
-          // Switch to default
-          setFloorPlan(DEFAULT_FLOOR_PLAN);
-        }
-      }
+      await fetch(`/api/projects/${id}`, { method: 'DELETE' });
     } catch (err) {
-      console.error('Error deleting project:', err);
+      console.warn('Server delete error (locally deleted):', err);
     }
+
+    // 4. Refresh projects list
+    fetchProjects();
+
+    // 5. If current active floorPlan is the deleted one, switch to another or clean layout
+    if (floorPlan.id === id) {
+      const remaining = getLocalProjects().filter((p) => p.id !== id);
+      if (remaining.length > 0) {
+        setFloorPlan(remaining[0]);
+      } else {
+        const freshPlan: FloorPlan = {
+          id: `proj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          name: 'New Floor Plan',
+          venueType: 'restaurant',
+          roomWidth: 40,
+          roomHeight: 30,
+          unit: 'ft',
+          gridSize: 20,
+          elements: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          version: 1
+        };
+        setFloorPlan(freshPlan);
+      }
+    }
+  };
+
+  // Rename a project
+  const handleRenameProject = (newName: string) => {
+    const updated = {
+      ...floorPlan,
+      name: newName,
+      updatedAt: new Date().toISOString()
+    };
+    setFloorPlan(updated);
+    recordHistory(updated);
+    saveProjectToCloud(updated);
   };
 
   // Undo / Redo
@@ -718,9 +829,13 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedElementId, historyIndex, history]);
 
-  // Debounced auto-save to cloud
+  // Debounced auto-save to cloud (only when actively in editor view)
   const saveTimeoutRef = useRef<number | null>(null);
   useEffect(() => {
+    if (activeView !== 'editor') return;
+    const deletedIds = getDeletedProjectIds();
+    if (deletedIds.includes(floorPlan.id)) return;
+
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = window.setTimeout(() => {
       saveProjectToCloud(floorPlan);
@@ -729,7 +844,7 @@ export default function App() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [floorPlan]);
+  }, [floorPlan, activeView]);
 
   // Landing Page View
   if (activeView === 'landing') {
@@ -817,6 +932,7 @@ export default function App() {
             floorPlan={floorPlan}
             onNewProject={() => setIsNewPlanModalOpen(true)}
             onSaveProject={() => saveProjectToCloud(floorPlan)}
+            onRenameProject={handleRenameProject}
             isSaving={isSaving}
             syncStatus={syncStatus}
             canUndo={historyIndex > 0}
@@ -840,7 +956,7 @@ export default function App() {
       <main className="flex-1 flex overflow-hidden relative">
         {activeView === 'editor' && (
           <>
-            {/* Left Sidebar (Furniture Library, Room Templates, Table Inspector) */}
+            {/* Left Sidebar (Desktop / Tablet collapsible drawer, hidden on mobile) */}
             <Sidebar
               floorPlan={floorPlan}
               onUpdateFloorPlan={handleUpdateFloorPlan}
@@ -876,6 +992,23 @@ export default function App() {
               }}
               onOpenPricing={() => setActiveView('pricing')}
             />
+
+            {/* Mobile Designer Canva-style Bottom Bar & Sheets (hidden on md+ screens) */}
+            <MobileDesignerBar
+              floorPlan={floorPlan}
+              onUpdateFloorPlan={handleUpdateFloorPlan}
+              selectedElementId={selectedElementId}
+              onSelectElement={handleSelectElement}
+              onUpdateElement={handleUpdateElement}
+              onDeleteElement={handleDeleteElement}
+              onDuplicateElement={handleDuplicateElement}
+              onAddPresetElement={handleAddPresetElement}
+              onApplyTemplate={handleApplyTemplate}
+              showGrid={showGrid}
+              setShowGrid={setShowGrid}
+              snapToGrid={snapToGrid}
+              setSnapToGrid={setSnapToGrid}
+            />
           </>
         )}
 
@@ -892,6 +1025,7 @@ export default function App() {
             onOpenTemplates={() => setActiveView('templates')}
             onBackToEditor={() => setActiveView('editor')}
             onOpenPricing={() => setActiveView('pricing')}
+            onSaveCurrentPlan={() => saveProjectToCloud(floorPlan)}
           />
         )}
 

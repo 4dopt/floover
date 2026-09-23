@@ -415,19 +415,22 @@ app.post('/api/projects', (req, res) => {
 app.put('/api/projects/:id', (req, res) => {
   const id = req.params.id;
   const existingIndex = projectsCache.findIndex((p: any) => p.id === id);
-  if (existingIndex === -1) {
-    return res.status(404).json({ error: 'Project not found' });
-  }
+  const baseProject = existingIndex >= 0 ? projectsCache[existingIndex] : {};
 
   const updatedProject = {
-    ...projectsCache[existingIndex],
+    ...baseProject,
     ...req.body,
     id,
+    createdAt: baseProject.createdAt || req.body.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    version: (projectsCache[existingIndex].version || 1) + 1
+    version: ((baseProject.version || 0) || 1) + 1
   };
 
-  projectsCache[existingIndex] = updatedProject;
+  if (existingIndex >= 0) {
+    projectsCache[existingIndex] = updatedProject;
+  } else {
+    projectsCache.unshift(updatedProject);
+  }
   saveProjects(projectsCache);
 
   // Broadcast layout change to WebSocket room
@@ -437,7 +440,7 @@ app.put('/api/projects/:id', (req, res) => {
     project: updatedProject
   });
 
-  res.json({ project: updatedProject, status: 'updated' });
+  res.json({ project: updatedProject, status: existingIndex >= 0 ? 'updated' : 'created' });
 });
 
 // Delete project
@@ -675,9 +678,16 @@ wss.on('connection', (ws: WebSocket) => {
             client.role = data.user.role || client.role || 'editor';
           }
 
+          // If client sent initial project and server doesn't have it yet, store it
+          let currentProject = projectsCache.find((p: any) => p.id === data.projectId);
+          if (!currentProject && data.project) {
+            currentProject = data.project;
+            projectsCache.unshift(currentProject);
+            saveProjects(projectsCache);
+          }
+
           // Send current room presence to all members in room
           const users = getRoomUsers(data.projectId);
-          const currentProject = projectsCache.find((p: any) => p.id === data.projectId);
 
           // Reply to joined client with current state
           ws.send(JSON.stringify({
@@ -718,6 +728,26 @@ wss.on('connection', (ws: WebSocket) => {
             name: client.name,
             color: client.color,
             elementId: data.elementId
+          });
+          break;
+        }
+
+        case 'element:create': {
+          if (!client.projectId || !data.element) return;
+          const project = projectsCache.find((p: any) => p.id === client.projectId);
+          if (project) {
+            const idx = project.elements.findIndex((e: any) => e.id === data.element.id);
+            if (idx === -1) {
+              project.elements.push(data.element);
+              project.updatedAt = new Date().toISOString();
+              saveProjects(projectsCache);
+            }
+          }
+
+          broadcastToRoom(client.projectId, ws, {
+            type: 'element:create',
+            userId: client.userId,
+            element: data.element
           });
           break;
         }
@@ -766,8 +796,11 @@ wss.on('connection', (ws: WebSocket) => {
           const idx = projectsCache.findIndex((p: any) => p.id === client.projectId);
           if (idx >= 0) {
             projectsCache[idx] = data.project;
-            saveProjects(projectsCache);
+          } else {
+            projectsCache.unshift(data.project);
           }
+          saveProjects(projectsCache);
+
           broadcastToRoom(client.projectId, ws, {
             type: 'room:sync',
             userId: client.userId,
@@ -798,12 +831,18 @@ wss.on('connection', (ws: WebSocket) => {
 
 // Upgrade HTTP to WS
 server.on('upgrade', (request, socket, head) => {
-  const pathname = request.url ? new URL(request.url, `http://${request.headers.host}`).pathname : '';
-  if (pathname === '/ws') {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
-    });
-  } else {
+  try {
+    const urlStr = request.url || '';
+    const pathname = urlStr.split('?')[0];
+    if (pathname === '/ws') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  } catch (err) {
+    console.error('WebSocket upgrade error:', err);
     socket.destroy();
   }
 });
